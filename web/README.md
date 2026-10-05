@@ -1,0 +1,112 @@
+# Aura.ai web demo
+
+A working version of the Aura.ai prototype (Ellie's design, kept in `prototype-ref/` for reference): Next.js on Cloud Run, Gemini on Vertex AI, Firestore and Cloud Storage. It looks and flows like the prototype; the parts that were faked are now real.
+
+| Prototype | This app |
+|---|---|
+| Aura's replies were regex presets | Gemini writes replies from your own records, cites the facts it used, and every reply passes a grounding check (below) |
+| Tapping a sample photo pre-filled fields | Gemini reads the actual photo (sample or your own) and proposes name, note and "caffeinated?"; you confirm before anything is saved |
+| Records in localStorage | Records saved per anonymous visitor session (Firestore); photos in Cloud Storage; reset affects only you |
+| No safety layer | Rules + Gemini classifier before every reply, output check after (PRD §7.3) |
+| Simulated Apple Health | Still available (labeled "simulated"), plus real `export.xml` import parsed in the browser |
+
+## Run locally
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. Without `GOOGLE_CLOUD_PROJECT` the app runs fully offline: records go to `web/.data/`, Aura uses the prototype's preset replies (labeled "Preset reply"), and photos aren't read automatically.
+
+To use Gemini locally, set `GOOGLE_CLOUD_PROJECT` (and optionally `GEMINI_MODEL`) in `web/.env.local`, then authenticate once:
+
+```bash
+gcloud auth application-default login
+```
+
+Tests (domain logic, safety rules, grounding):
+
+```bash
+npm test
+```
+
+The discovery tests include golden values captured from the prototype itself: demo days 1, 4 and 10 must produce exactly the prototype's comparisons (for example, Day 10: under 7 h of sleep 2.5 over 4 days vs 7 h or more 3.7 over 3 days).
+
+## Deploy to Cloud Run
+
+```bash
+PROJECT=your-project-id
+REGION=us-central1
+gcloud config set project $PROJECT
+gcloud services enable run.googleapis.com aiplatform.googleapis.com firestore.googleapis.com storage.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+gcloud firestore databases create --location=$REGION
+gcloud storage buckets create gs://$PROJECT-aura-photos --location=$REGION --uniform-bucket-level-access
+
+gcloud iam service-accounts create aura-web
+SA=aura-web@$PROJECT.iam.gserviceaccount.com
+for role in roles/aiplatform.user roles/datastore.user; do
+  gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$SA --role=$role
+done
+gcloud storage buckets add-iam-policy-binding gs://$PROJECT-aura-photos --member=serviceAccount:$SA --role=roles/storage.objectAdmin
+
+gcloud run deploy aura-web --source web --region $REGION --service-account $SA --allow-unauthenticated \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=global,GEMINI_MODEL=gemini-2.5-flash,PHOTO_BUCKET=$PROJECT-aura-photos
+```
+
+No API key is stored anywhere: Cloud Run's service account calls Vertex AI, Firestore and Cloud Storage. Check that `GEMINI_MODEL` is available in your project and location before deploying.
+
+## Architecture
+
+```
+src/domain/   Pure TypeScript shared by browser and server (ported from the prototype)
+  topics.ts     the three observation topics, concerns, ranking
+  state.ts      records: observations, check-ins, entries, plans, feedback
+  health.ts     sample data, export.xml streaming parser, daily() accessor
+  discovery.ts  descriptive comparisons (MIN_DAYS 4, MIN_GROUP 2, gap ≥ 0.5)
+  demo.ts       Day 1 / 4 / 10 timelines
+  steps.ts      the reviewed step whitelist Aura may choose from
+src/server/
+  session.ts    anonymous httpOnly cookie → one record set per visitor
+  repo.ts       Firestore + Cloud Storage (or web/.data/ locally)
+  gemini.ts     Vertex AI client, structured JSON output
+  safety.ts     PRD §7.3 safety floor
+  agent.ts      Aura's reply: facts → Gemini → grounding check → fallback
+  vision.ts     food photo → fields to confirm
+src/app/api/   session (GET/PUT/DELETE), aura (POST), photo (POST, GET /[id])
+src/ui/        React port of the prototype's screens; CSS reused verbatim
+```
+
+### How Aura stays grounded (PRD §3.2)
+
+1. Code computes everything numeric: `analyze()` comparisons, the last 7 days of records, the current step's feedback. Each becomes a **fact with an ID** (`cmp:evening-energy:short-sleep`, `rec:week`, `plan:…`).
+2. Gemini returns JSON: `reply`, `cited` fact IDs, an optional `stepId` from the whitelist, an optional action.
+3. The server rejects the reply if a cited ID doesn't exist, **any number in the reply isn't in a cited fact** (or the user's own words), the wording claims causes, diagnoses, prescribes or reassures, or the step isn't allowed (a finding step needs that finding to exist).
+4. One retry with the problems listed. If it still fails, Aura shows a summary built only from code, with no step.
+
+Discovery cards are always rendered by code; Gemini never produces the numbers on screen.
+
+### Safety (PRD §7.3)
+
+- **Emergency** wording (sudden severe headache, chest pain, breathing trouble, stroke signs, self-harm) gets a fixed message at once, without waiting for the model.
+- **Medication, dosing or diagnosis** requests get an out-of-scope reply.
+- **Professional-assessment** cases (heavy or irregular bleeding, persistent or worsening symptoms) pause steps.
+- **Reporting "worse"**, in chat or in step feedback, stops the active step.
+- Rules handle negation ("no chest pain"). A Gemini classifier then reads meaning and past events; it can raise a level but never lower a rule match.
+- If the classifier fails, no new step is offered.
+- Aura's own reply is also checked before it's shown.
+
+### Data handling
+
+- Sessions are isolated by cookie. Photos are served only to the session that uploaded them.
+- "Delete all records and restart" removes this session's document and photos.
+- Apple Health `export.xml` is parsed in the browser; only daily totals are saved.
+- Each session gets a Gemini call budget (`AI_CALLS_PER_HOUR`).
+
+## Known limits
+
+- Apple Health in the browser is either simulated (labeled) or from an `export.xml` you choose. The iOS PoC (`../HealthConnectorPoC`) can inject `window.AuraHealthBridge` for a live connection; that hookup isn't done yet.
+- The grounding check verifies numbers, citations, steps and banned wording; it can't catch every semantic error in free text.
+- The safety rules and copy follow the PRD draft and still need the content review named in PRD §7.3.
+- The demo uses the name "Alex" and fictional records throughout.

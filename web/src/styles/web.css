@@ -1,0 +1,6 @@
+/* Additions for the web build (not in the prototype CSS). */
+#app, body > .phone { min-height: 100dvh; }
+.bubble .speaker .via { font-weight: 400; opacity: .7; }
+.bubble.guide.urgent { border: 1px solid #ff8a7a; }
+.saveerror { position: fixed; left: 50%; transform: translateX(-50%); top: calc(10px + env(safe-area-inset-top, 0px)); z-index: 60; background: #5a2020; color: #ffe2dc; padding: 8px 14px; border-radius: 12px; font-size: 13px; max-width: 90vw; }
+.photobuttons label.filebutton { cursor: pointer; }

@@ -1,0 +1,1001 @@
+/* One charcoal world; luminous color belongs to Aura and the data. */
+:root {
+  color-scheme: dark;
+  --ink: #f2f2f0;
+  --muted: #b5b9c3;
+  --blue: #eeb28b;
+  --bg: #17191d;
+  --line: #3a3e47;
+  --surface: #22252b;
+  --surface-raised: #292d35
+}
+
+body {
+  background: #101215;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif
+}
+
+::selection {
+  background: #eeb28b;
+  color: #17191d
+}
+
+input,
+textarea {
+  caret-color: #eeb28b
+}
+
+* {
+  scrollbar-color: #646975 #22252b;
+  scrollbar-width: thin
+}
+
+.phone {
+  min-height: 100dvh;
+  box-shadow: none
+}
+
+header {
+  padding: 24px 26px
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -.7px
+}
+
+.wordmark .brand-ai {
+  font-size: 18px;
+  color: #c3c6ce;
+  margin-left: -9px
+}
+
+.wordmark .brand-aura {
+  margin: 0;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #ffd6b3 2%, #df9b7c 30%, #859dd2 64%, #52688c 95%)
+}
+
+h1 {
+  font-weight: 500;
+  letter-spacing: -.035em
+}
+
+h2,
+h3 {
+  font-weight: 500;
+  letter-spacing: -.02em
+}
+
+.primary {
+  background: #eeb28b;
+  color: #211c19
+}
+
+.text {
+  color: #efbb99
+}
+
+.quiet {
+  color: #b5b9c3
+}
+
+button:active {
+  transform: scale(.985)
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #eeb28b;
+  outline-offset: 4px
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: .4px;
+  text-transform: none;
+  font-weight: 500;
+  color: #b5b9c3
+}
+
+.greeting p {
+  color: #b5b9c3
+}
+
+.greeting h1 {
+  font-size: 38px;
+  line-height: 1.16
+}
+
+.guidehello {
+  gap: 16px;
+  margin: 25px 0 30px
+}
+
+.guidehello strong {
+  font-weight: 500;
+  font-size: 17px
+}
+
+.guidehello p {
+  font-size: 13px
+}
+
+.guidehello>span:last-child {
+  color: #b5b9c3
+}
+
+.task {
+  background: #22252b;
+  box-shadow: none;
+  border: 1px solid #343840;
+  min-height: 132px;
+  padding: 23px 20px
+}
+
+.task h3 {
+  font-size: 21px
+}
+
+.task p {
+  font-size: 13px;
+  color: #bcc0ca
+}
+
+.tile {
+  background: transparent !important;
+  width: 56px;
+  height: 70px;
+  color: #c9cdd7;
+  font-size: 29px
+}
+
+.completed {
+  border-color: #688e80
+}
+
+.status {
+  color: #b6d5c5
+}
+
+.quicklog {
+  background: #22252b;
+  border-color: #343840
+}
+
+.smallaction,
+.filebutton {
+  background: #323640;
+  color: #f0f0ee;
+  min-height: 44px
+}
+
+.footnote {
+  color: #b5b9c3;
+  font-size: 11px
+}
+
+.option {
+  background: #22252b;
+  border-color: #3a3e47;
+  min-height: 65px
+}
+
+.option i {
+  color: #b5b9c3
+}
+
+.option.selected {
+  background: #322c28;
+  border-color: #eeb28b
+}
+
+.option.selected i {
+  color: #eeb28b
+}
+
+.topicpreview {
+  background: #22252b
+}
+
+.progress {
+  background: #343840
+}
+
+.progress i {
+  background: #eeb28b
+}
+
+nav {
+  background: #1c1e23f5;
+  border-color: #363a43;
+  padding-top: 15px;
+  min-height: 76px
+}
+
+nav button {
+  color: #b5b9c3;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px
+}
+
+nav .current {
+  color: #f2d1ba;
+  font-weight: 500
+}
+
+.nav-aura {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #eeb28b, #7b92be);
+  display: inline-block
+}
+
+.overlay {
+  background: #090a0dd9
+}
+
+.sheet {
+  background: #202329;
+  border: 1px solid #3a3e47
+}
+
+.close {
+  background: #323640
+}
+
+.sheet p {
+  color: #bcc0ca
+}
+
+.sheet details,
+.callout,
+.reviewfacts {
+  background: #2b2e36;
+  color: #c4c8d1
+}
+
+.inputlabel input,
+.inputlabel select,
+.inputlabel textarea {
+  background: #181b20;
+  color: #f2f2f0;
+  border-color: #565c68
+}
+
+.inputlabel input::placeholder,
+.inputlabel textarea::placeholder,
+.composer textarea::placeholder {
+  color: #a9aeba
+}
+
+.ratings button {
+  background: #343840
+}
+
+.ratings .selected {
+  background: #eeb28b;
+  color: #211c19
+}
+
+.planbanner,
+.activejourney,
+.draft {
+  background: #2e2b29;
+  border: 1px solid #4b423c
+}
+
+.planbanner>span {
+  color: #eeb28b
+}
+
+.tags span {
+  background: #393a40;
+  color: #d4d7df
+}
+
+.journeysteps {
+  color: #c9c6c2
+}
+
+.chatheading {
+  align-items: center;
+  gap: 18px;
+  padding: 6px 0 25px
+}
+
+.chatheading h2 {
+  font-size: 26px;
+  margin-bottom: 5px
+}
+
+.chatheading small {
+  font-size: 12px;
+  color: #bcc0ca
+}
+
+.messages {
+  gap: 24px
+}
+
+.bubble.guide {
+  background: transparent;
+  padding: 8px 0;
+  border-radius: 0;
+  max-width: 100%;
+  font-size: 16px;
+  line-height: 1.65
+}
+
+.speaker {
+  display: block;
+  color: #eeb28b;
+  font-size: 12px;
+  margin-bottom: 9px
+}
+
+.bubble.user {
+  background: #2f3440;
+  border-radius: 20px;
+  padding: 16px 18px;
+  font-size: 15px
+}
+
+.suggestions button {
+  background: #242830;
+  border-color: #454b57;
+  color: #d2d5dc;
+  min-height: 44px
+}
+
+.composer {
+  background: #242830;
+  border-color: #555b67;
+  border-radius: 25px
+}
+
+.composer textarea {
+  color: #f2f2f0
+}
+
+.composer button {
+  background: #eeb28b;
+  color: #211c19
+}
+
+.aura-log-offer {
+  padding: 18px 0
+}
+
+.aura-log-offer p {
+  font-size: 13px;
+  margin-bottom: 12px
+}
+
+.aura-log-offer button {
+  margin: 0 6px 8px 0
+}
+
+.aura-understanding {
+  color: #eeb28b;
+  font-size: 13px
+}
+
+.chartbox,
+.focuschart,
+.updatecard {
+  background: #22252b
+}
+
+.sources span {
+  background: #2b2f37;
+  color: #c9cdd6
+}
+
+.compacttopic {
+  background: #22252b
+}
+
+.dayevents {
+  border-color: #687994
+}
+
+.logentry {
+  border-color: #3a3e47
+}
+
+.foodpreview {
+  background: #181b20
+}
+
+.error {
+  color: #ffb7b0
+}
+
+.healthicon {
+  color: #eeb28b
+}
+
+.layeredchart {
+  background: #20232e;
+  border: 1px solid #393e4c
+}
+
+.overlaytabs button {
+  background: #2c303b;
+  border-color: #586174;
+  color: #d5d9e3
+}
+
+.overlaytabs button[aria-pressed=true] {
+  background: #3a414f
+}
+
+.signalreadings {
+  border-color: #4a5362
+}
+
+.chartscales,
+.layeredchart .chartintro,
+.layeredchart .sectionlabel small {
+  color: #c0c7d6
+}
+
+.overlaydates button.selected {
+  background: #eeb28b;
+  color: #211c19
+}
+
+.overlaydates button.selected small {
+  color: #211c19
+}
+
+/* Live Aura: static layered gradients; only transform/opacity animate. */
+.live-aura {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  isolation: isolate
+}
+
+.aura-atmosphere,
+.aura-core,
+.aura-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none
+}
+
+.aura-atmosphere {
+  background: radial-gradient(circle at 57% 55%, #7698cb99 0%, #6989c275 35%, #50689233 57%, transparent 74%);
+  transform: scale(1.2)
+}
+
+.aura-core {
+  inset: 10%;
+  background: radial-gradient(circle at 40% 39%, #ffdab3 0%, #efb18e 23%, #c89b9b 45%, #889fc1 68%, #617aab44 87%, transparent 98%);
+  box-shadow: inset -8px -9px 15px #39537a30;
+  opacity: .95
+}
+
+.aura-ripple {
+  border: 1px solid #d1b6a180;
+  opacity: 0
+}
+
+.aura-large {
+  width: 240px;
+  height: 240px;
+  margin: 8px auto 35px;
+  display: block
+}
+
+.aura-chat {
+  width: 64px;
+  height: 64px
+}
+
+.aura-small {
+  width: 48px;
+  height: 48px
+}
+
+.aura-splash {
+  padding: 26px 32px 26px;
+  min-height: calc(100dvh - 86px);
+  gap: 30px
+}
+
+.aura-opening {
+  padding-top: 12px
+}
+
+.aura-splash h1 {
+  font-size: 48px;
+  line-height: 1.1;
+  font-weight: 500;
+  margin: 0 0 20px;
+  letter-spacing: -.035em
+}
+
+.aura-splash p {
+  font-size: 17px;
+  line-height: 1.6;
+  color: #b5b9c3
+}
+
+.aura-splash .primary {
+  margin-top: 0
+}
+
+.splashbottom small {
+  color: #aeb3bd;
+  font-size: 11px
+}
+
+.splashbottom .text {
+  margin: 9px auto
+}
+
+.aura-splash .aura-core {
+  box-shadow: inset -30px -25px 55px #39537a35
+}
+
+@media(prefers-reduced-motion:no-preference) {
+  .aura-core {
+    animation: aura-breathe 7s ease-in-out infinite
+  }
+
+  .aura-atmosphere {
+    animation: aura-drift 11s ease-in-out infinite
+  }
+
+  .live-aura[data-aura-state=listening] .aura-core {
+    animation: aura-breathe 3s ease-in-out infinite
+  }
+
+  .live-aura[data-aura-state=understanding] .aura-core {
+    animation: aura-gather 1.4s ease-in-out infinite
+  }
+
+  .live-aura[data-aura-state=insight] .aura-ripple {
+    animation: aura-reveal 1.5s ease-out
+  }
+
+  .aura-opening {
+    animation: aura-arrive .7s ease-out
+  }
+
+  button {
+    transition: background .2s, transform .2s
+  }
+}
+
+@keyframes aura-breathe {
+
+  0%,
+  100% {
+    transform: scale(.96);
+    opacity: .87
+  }
+
+  50% {
+    transform: scale(1.04);
+    opacity: 1
+  }
+}
+
+@keyframes aura-drift {
+
+  0%,
+  100% {
+    transform: scale(1.15) translate(-2%, 1%);
+    opacity: .7
+  }
+
+  50% {
+    transform: scale(1.27) translate(2%, -1%);
+    opacity: 1
+  }
+}
+
+@keyframes aura-gather {
+
+  0%,
+  100% {
+    transform: scale(.8);
+    opacity: .75
+  }
+
+  50% {
+    transform: scale(.9);
+    opacity: 1
+  }
+}
+
+@keyframes aura-reveal {
+  0% {
+    transform: scale(.9);
+    opacity: .65
+  }
+
+  100% {
+    transform: scale(1.65);
+    opacity: 0
+  }
+}
+
+@keyframes aura-arrive {
+  from {
+    opacity: .55;
+    transform: translateY(8px)
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0)
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+
+  .live-aura *,
+  .aura-opening {
+    animation: none !important
+  }
+
+  button {
+    transition: none
+  }
+}
+
+@media(max-width:560px) {
+  .aura-splash {
+    padding: 18px 26px 25px
+  }
+
+  .aura-large {
+    width: 210px;
+    height: 210px;
+    margin-bottom: 30px
+  }
+
+  .aura-splash h1 {
+    font-size: 44px
+  }
+
+  .task {
+    padding: 21px 18px
+  }
+
+  .sheet {
+    border-bottom: 0
+  }
+}
+
+@media(max-height:740px) {
+  .aura-large {
+    width: 155px;
+    height: 155px;
+    margin: 0 auto 25px
+  }
+
+  .aura-opening {
+    padding-top: 0
+  }
+
+  .aura-splash h1 {
+    font-size: 40px
+  }
+
+  .aura-splash {
+    gap: 20px
+  }
+
+  .aura-splash p {
+    font-size: 15px
+  }
+}
+
+/* Explore leads with an edge-to-edge timeline; records follow below the fold. */
+.explore-full {
+  --page-gutter: 26px;
+  padding-top: 18px
+}
+
+.explore-title h1 {
+  font-size: 30px;
+  margin: 5px 0 10px
+}
+
+.explore-title p {
+  font-size: 14px
+}
+
+.explore-full .layeredchart {
+  margin: 26px calc(-1 * var(--page-gutter)) 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-height: calc(100svh - 195px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden
+}
+
+.explore-full .chartintro {
+  padding: 0 var(--page-gutter);
+  margin: 0 0 16px;
+  font-size: 12px
+}
+
+.explore-full .overlaytabs {
+  padding: 0 var(--page-gutter);
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  flex-shrink: 0
+}
+
+.explore-full .overlaytabs button {
+  padding: 10px 11px;
+  white-space: nowrap;
+  min-height: 44px;
+  font-size: 11px
+}
+
+.explore-full .overlayplot {
+  margin-top: 26px;
+  min-height: 330px;
+  flex: 1;
+  width: 100%;
+  height: auto
+}
+
+.explore-full .overlaydates {
+  padding: 12px 10px 28px;
+  margin: 0;
+  flex-shrink: 0
+}
+
+.explore-full .chart-details {
+  padding-top: 28px
+}
+
+.chart-details .signalreadings {
+  padding-top: 22px
+}
+
+.chart-details .sectionlabel small {
+  color: var(--muted)
+}
+
+.explore-full .sources {
+  margin: 26px 0 34px
+}
+
+.explore-full .dayevents {
+  margin-bottom: 36px
+}
+
+.explore-full {
+  padding-bottom: 140px
+}
+
+/* Frosted-glass web treatment, with solid fallbacks for reduced transparency. */
+.phone nav {
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(calc(100% - 32px), 528px);
+  min-height: 72px;
+  padding: 9px;
+  border: 1px solid #ffffff26;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #ffffff12, #ffffff04), #252a34c7;
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  box-shadow: inset 0 1px 0 #ffffff16, 0 12px 35px #090c1266;
+  gap: 6px;
+  isolation: isolate
+}
+
+.phone nav button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  border-radius: 21px;
+  z-index: 1;
+  color: #c6cbd6;
+  font-size: 13px
+}
+
+.phone nav button::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 19px;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 100%, #eeb28b38, transparent 75%);
+  border: 1px solid #edbc902e;
+  opacity: 0;
+  transition: opacity .25s;
+  pointer-events: none
+}
+
+.phone nav button.current,
+.phone nav button:focus-visible {
+  color: #ffe0c9;
+  background: #eeb28b0b;
+  text-shadow: 0 0 16px #eeb28b80;
+  box-shadow: 0 0 22px #eeb28b13, inset 0 1px 0 #ffffff0d
+}
+
+.phone nav button.current::before,
+.phone nav button:focus-visible::before {
+  opacity: 1
+}
+
+.phone nav button:focus-visible {
+  outline: 2px solid #efbc99;
+  outline-offset: 1px
+}
+
+.phone nav .current .nav-aura {
+  box-shadow: 0 0 12px #edbd9999
+}
+
+.phone nav button:hover {
+  background: #ffffff0a
+}
+
+@media(max-width:560px) {
+  .explore-full {
+    --page-gutter: 22px
+  }
+
+  .explore-title h1 {
+    font-size: 28px
+  }
+}
+
+@media(max-width:360px) {
+  .explore-full .overlaytabs {
+    gap: 4px;
+    padding: 0 14px
+  }
+
+  .explore-full .overlaytabs button {
+    padding: 10px 8px;
+    font-size: 10px
+  }
+}
+
+@media(prefers-reduced-transparency:reduce) {
+  .phone nav {
+    background: #292e38;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none
+  }
+}
+
+@supports not (backdrop-filter:blur(1px)) {
+  .phone nav {
+    background: #292e38
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .phone nav button::before {
+    transition: none
+  }
+}
+
+.explore-full .overlaydates {
+  padding: 20px 10px 0
+}
+
+.explore-full .overlayplot {
+  flex: none;
+  height: max(350px, calc(100svh - 395px));
+  min-height: 0;
+  margin-top: 12px
+}
+
+.explore-full .layeredchart {
+  min-height: calc(100svh - 195px)
+}
+
+/* Phone proportions stay portrait-sized in a wide browser. */
+.phone {
+  max-width: 430px
+}
+
+.phone nav {
+  width: min(calc(100% - 32px), 398px)
+}
+
+.sheet {
+  max-width: 410px
+}
+
+.explore-full .overlayplot {
+  height: auto;
+  aspect-ratio: 360/420;
+  min-height: 0
+}
+
+.explore-full .layeredchart {
+  min-height: calc(100svh - 195px)
+}
+
+@media(min-width:561px) {
+  .phone {
+    border-inline: 1px solid #ffffff0b
+  }
+
+  .explore-full {
+    --page-gutter: 22px
+  }
+
+  main {
+    padding-inline: 22px
+  }
+
+  .aura-large {
+    width: 210px;
+    height: 210px
+  }
+
+  .aura-splash h1 {
+    font-size: 44px
+  }
+}
+
+@media(prefers-reduced-motion:no-preference) {
+  .chart-enter [data-series] {
+    animation: aura-chart-reveal 1.2s cubic-bezier(.16, 1, .3, 1) both
+  }
+
+  .chart-enter [data-series=activity] {
+    animation-delay: .12s
+  }
+
+  .chart-enter [data-series=feeling] {
+    animation-delay: .24s
+  }
+}
+
+@keyframes aura-chart-reveal {
+  from {
+    clip-path: inset(0 100% 0 0)
+  }
+
+  to {
+    clip-path: inset(0 0 0 0)
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .chart-enter [data-series] {
+    animation: none
+  }
+}
