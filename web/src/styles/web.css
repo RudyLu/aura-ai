@@ -11,3 +11,17 @@
 .linkqr { background: #fff; border-radius: 16px; padding: 12px; width: 220px; height: 220px; margin: 8px auto; }
 .linkqr svg { display: block; width: 100%; height: 100%; }
 .linkurl { word-break: break-all; font-size: 12px; text-align: center; }
+
+/* Waiting for Gemini: Aura's typing bubble in the chat, and the photo-reading line. */
+.typing-bubble { display: grid; gap: 8px; }
+.typing-bubble .speaker { margin-bottom: 0; }
+.typing-note { color: #b7bbc4; font-size: 14px; }
+.typing-line { display: flex; align-items: center; gap: 10px; }
+.typing-dots { display: inline-flex; gap: 6px; align-items: center; height: 14px; }
+.typing-dots i { width: 8px; height: 8px; border-radius: 50%; background: #eeb28b; opacity: .35; animation: typing-dot 1.2s infinite ease-in-out; }
+.typing-dots i:nth-child(2) { animation-delay: .15s; }
+.typing-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes typing-dot { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .typing-dots i { animation: typing-fade 1.6s infinite ease-in-out; } }
+@keyframes typing-fade { 50% { opacity: 1; } }
+.composer button[aria-busy="true"] { opacity: .45; }

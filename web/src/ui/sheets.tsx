@@ -74,7 +74,7 @@ function FoodSheet() {
       {photo ? (
         <>
           <button type="button" className="photoswap" aria-label="Change photo" onClick={e => dispatch('photo-pick-open', undefined, {}, e.currentTarget)}><img className="foodpreview" src={photo} alt="Selected food photo" /><span>Change</span></button>
-          {ui.m.reading ? <p className="soft" role="status">Gemini is reading the photo…</p> : null}
+          {ui.m.reading ? <p className="soft typing-line" role="status"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>Gemini is reading the photo…</p> : null}
           {x ? <div className="callout"><strong>Filled in from the photo.</strong> Check the details before saving.{x.confirm.length ? <><br /><small>Worth checking: {x.confirm.join(' · ')}</small></> : null}</div> : null}
           {ui.m.photoError ? <p className="soft">{ui.m.photoError}</p> : null}
         </>

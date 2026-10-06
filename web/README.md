@@ -57,9 +57,9 @@ gcloud run deploy aura-web --source web --region $REGION --service-account $SA -
 
 No API key is stored anywhere: Cloud Run's service account calls Vertex AI, Firestore and Cloud Storage. Check that `GEMINI_MODEL` is available in your project and location before deploying.
 
-### Current deployment (without Gemini)
+### Current deployment
 
-Live at https://aura-web-664697749037.us-central1.run.app (project `aura-ai-510710`, `us-central1`). Gemini is off, so Aura gives preset replies and Vertex AI is not enabled. Setup used the steps above minus `aiplatform.googleapis.com` and `roles/aiplatform.user`, plus one fix for new projects: the default compute service account needs build permissions, or `gcloud run deploy --source` fails with `PERMISSION_DENIED`.
+Live at https://aura-web-664697749037.us-central1.run.app (project `aura-ai-510710`, `us-central1`) with Gemini on: `gemini-2.5-flash` on Vertex AI, location `global`. One setup fix for new projects: the default compute service account needs build permissions, or `gcloud run deploy --source` fails with `PERMISSION_DENIED`.
 
 ```bash
 PROJECT=aura-ai-510710
@@ -69,10 +69,10 @@ for role in roles/cloudbuild.builds.builder roles/storage.objectViewer roles/art
 done
 
 gcloud run deploy aura-web --source web --region us-central1 --service-account aura-web@$PROJECT.iam.gserviceaccount.com --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT,GEMINI_DISABLED=1,PHOTO_BUCKET=$PROJECT-aura-photos
+  --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=global,GEMINI_MODEL=gemini-2.5-flash,PHOTO_BUCKET=$PROJECT-aura-photos
 ```
 
-To turn Gemini on later: enable `aiplatform.googleapis.com`, grant `roles/aiplatform.user` to `aura-web`, then redeploy with `--update-env-vars GEMINI_DISABLED=,GOOGLE_CLOUD_LOCATION=global`.
+Model notes (October 2026): `gemini-3.8-flash` is GA and works (`GEMINI_MODEL=gemini-3.8-flash`, thinking is set to `LOW` automatically), but on this project it was slow and erratic (4 s to several minutes per call), so the safety classifier's 8 s limit often failed. Calls are bounded with `GEMINI_THINKING_LEVEL` (Gemini 3, default `LOW`) or `GEMINI_THINKING_BUDGET` (Gemini 2.5, default 1024 tokens). Vertex's shared capacity sometimes answers 429; each call retries once.
 
 ## Architecture
 

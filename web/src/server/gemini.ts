@@ -1,8 +1,14 @@
 // Gemini on Vertex AI. Cloud Run's service account provides credentials (ADC); no API
 // key is stored. Locally, `gcloud auth application-default login` does the same.
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type ThinkingLevel } from '@google/genai';
 
 export const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Both model families think before answering, and unbounded thinking on Aura's long prompt can
+// pass the 20 s timeout; Aura makes up to three calls per message (safety, reply, retry).
+// Gemini 3 takes a level ("LOW"), Gemini 2.5 a token budget.
+const THINKING_LEVEL = (process.env.GEMINI_THINKING_LEVEL || 'LOW').toUpperCase() as ThinkingLevel;
+const THINKING_BUDGET = Number(process.env.GEMINI_THINKING_BUDGET || 1024);
+const thinkingConfig = () => MODEL.startsWith('gemini-3') ? { thinkingLevel: THINKING_LEVEL } : { thinkingBudget: THINKING_BUDGET };
 
 let client: GoogleGenAI | null = null;
 export const geminiConfigured = () => !!process.env.GOOGLE_CLOUD_PROJECT && process.env.GEMINI_DISABLED !== '1';
@@ -24,7 +30,9 @@ export async function generateJSON<T>(opts: {
   schema: object; temperature?: number; timeoutMs?: number;
 }): Promise<T> {
   if (!geminiConfigured()) throw new Error('Gemini is not configured (set GOOGLE_CLOUD_PROJECT).');
-  const res = await ai().models.generateContent({
+  // One timeout covers both attempts, so callers' time limits still hold.
+  const signal = AbortSignal.timeout(opts.timeoutMs ?? 20000);
+  const call = () => ai().models.generateContent({
     model: MODEL,
     contents: [{ role: 'user', parts: opts.parts }],
     config: {
@@ -32,9 +40,20 @@ export async function generateJSON<T>(opts: {
       responseMimeType: 'application/json',
       responseJsonSchema: opts.schema,
       temperature: opts.temperature ?? 0.3,
-      abortSignal: AbortSignal.timeout(opts.timeoutMs ?? 20000)
+      thinkingConfig: thinkingConfig(),
+      abortSignal: signal
     }
   });
+  let res;
+  try {
+    res = await call();
+  } catch (e) {
+    // Vertex's shared capacity answers 429 (or 5xx) in bursts; one quick retry usually lands.
+    const status = (e as { status?: number }).status;
+    if (signal.aborted || !status || (status !== 429 && status < 500)) throw e;
+    await new Promise(r => setTimeout(r, 500));
+    res = await call();
+  }
   const text = res.text;
   if (!text) throw new Error('Empty response from Gemini');
   return JSON.parse(text) as T;
