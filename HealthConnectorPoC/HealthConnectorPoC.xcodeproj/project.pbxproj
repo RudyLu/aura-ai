@@ -29,7 +29,7 @@
 		3A173D6B388E53E8A7E79D47 /* SleepNightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepNightsView.swift; sourceTree = "<group>"; };
 		3F22393F865258CFEA33113C /* HealthConnectorPoC.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthConnectorPoC.entitlements; sourceTree = "<group>"; };
 		63C00AAD26A673BF4A90DDCA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		7E9A0C0882E30132A29DA6E7 /* HealthConnectorPoC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthConnectorPoC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E9A0C0882E30132A29DA6E7 /* HealthConnectorPoC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthConnectorPoC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8308B2FFB5A07C6D28D7C088 /* HealthTypeCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthTypeCatalog.swift; sourceTree = "<group>"; };
 		942D4F9F0EAEC0936DF3D575 /* DebugSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSeeder.swift; sourceTree = "<group>"; };
 		944BF36B1638EE0C8BD0EA1D /* HealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthService.swift; sourceTree = "<group>"; };
@@ -125,7 +125,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					ABAADDB2476343646EF35835 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -191,6 +190,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthConnectorPoC/HealthConnectorPoC.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = K2QNURVTVU;
 				INFOPLIST_FILE = HealthConnectorPoC/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -271,6 +271,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthConnectorPoC/HealthConnectorPoC.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = K2QNURVTVU;
 				INFOPLIST_FILE = HealthConnectorPoC/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
