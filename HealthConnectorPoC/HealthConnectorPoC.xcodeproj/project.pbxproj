@@ -15,8 +15,10 @@
 		1E00463103E84EF80E3E0295 /* DebugSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942D4F9F0EAEC0936DF3D575 /* DebugSeeder.swift */; };
 		2982CB7D062A0CC43F4EE8CA /* SleepNightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A173D6B388E53E8A7E79D47 /* SleepNightsView.swift */; };
 		576327FA5DFC2CCA4FDDA99A /* SignalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962AAB92A797C304F2A5A0FE /* SignalRecord.swift */; };
+		7DE4CDD011D25FDC6AE6895F /* AuraLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = D276F259EB1FDE479F9D7D5E /* AuraLink.swift */; };
 		8D4473F5CE301A03515760E6 /* HealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944BF36B1638EE0C8BD0EA1D /* HealthService.swift */; };
 		93D5FDD0099E4E326E167922 /* HealthTypeCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8308B2FFB5A07C6D28D7C088 /* HealthTypeCatalog.swift */; };
+		ABAF0DAC8A3EEDF59BC20EBF /* LinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCBCD3E3BF424DA86DC5496F /* LinkView.swift */; };
 		CD0C0E79662007B8894986AD /* RecordDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C30A371F457A92FBEA00B9 /* RecordDetailView.swift */; };
 		E508FD136A677E92BC4D2CB1 /* UpdateLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFBA21DB5E4C5C5849429AA /* UpdateLog.swift */; };
 		E8906F0425B5A16BABBFB695 /* SleepNights.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB70987F325BB684B9AD665 /* SleepNights.swift */; };
@@ -27,7 +29,7 @@
 		3A173D6B388E53E8A7E79D47 /* SleepNightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepNightsView.swift; sourceTree = "<group>"; };
 		3F22393F865258CFEA33113C /* HealthConnectorPoC.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthConnectorPoC.entitlements; sourceTree = "<group>"; };
 		63C00AAD26A673BF4A90DDCA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		7E9A0C0882E30132A29DA6E7 /* HealthConnectorPoC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthConnectorPoC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E9A0C0882E30132A29DA6E7 /* HealthConnectorPoC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthConnectorPoC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8308B2FFB5A07C6D28D7C088 /* HealthTypeCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthTypeCatalog.swift; sourceTree = "<group>"; };
 		942D4F9F0EAEC0936DF3D575 /* DebugSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSeeder.swift; sourceTree = "<group>"; };
 		944BF36B1638EE0C8BD0EA1D /* HealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthService.swift; sourceTree = "<group>"; };
@@ -36,7 +38,9 @@
 		9FFBA21DB5E4C5C5849429AA /* UpdateLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLog.swift; sourceTree = "<group>"; };
 		A80DDBD1A63C751F6F28617E /* TypeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeDetailView.swift; sourceTree = "<group>"; };
 		A9EC47F96B4478FC8070227D /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		D276F259EB1FDE479F9D7D5E /* AuraLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuraLink.swift; sourceTree = "<group>"; };
 		DA488714C6E08A70966165E5 /* UpdateLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogView.swift; sourceTree = "<group>"; };
+		DCBCD3E3BF424DA86DC5496F /* LinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkView.swift; sourceTree = "<group>"; };
 		ECB70987F325BB684B9AD665 /* SleepNights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepNights.swift; sourceTree = "<group>"; };
 		F9C15638D8B85E370EFF0E5A /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -53,6 +57,7 @@
 		4543A54A270800E02D7DF684 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				DCBCD3E3BF424DA86DC5496F /* LinkView.swift */,
 				F9C15638D8B85E370EFF0E5A /* OverviewView.swift */,
 				96C30A371F457A92FBEA00B9 /* RecordDetailView.swift */,
 				3A173D6B388E53E8A7E79D47 /* SleepNightsView.swift */,
@@ -67,6 +72,7 @@
 			children = (
 				A9EC47F96B4478FC8070227D /* App.swift */,
 				2A513EC7633C20137E78A0A4 /* Assets.xcassets */,
+				D276F259EB1FDE479F9D7D5E /* AuraLink.swift */,
 				942D4F9F0EAEC0936DF3D575 /* DebugSeeder.swift */,
 				3F22393F865258CFEA33113C /* HealthConnectorPoC.entitlements */,
 				944BF36B1638EE0C8BD0EA1D /* HealthService.swift */,
@@ -119,6 +125,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					ABAADDB2476343646EF35835 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -159,9 +166,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				16A13E2EE2FB9864ADC23CAA /* App.swift in Sources */,
+				7DE4CDD011D25FDC6AE6895F /* AuraLink.swift in Sources */,
 				1E00463103E84EF80E3E0295 /* DebugSeeder.swift in Sources */,
 				8D4473F5CE301A03515760E6 /* HealthService.swift in Sources */,
 				93D5FDD0099E4E326E167922 /* HealthTypeCatalog.swift in Sources */,
+				ABAF0DAC8A3EEDF59BC20EBF /* LinkView.swift in Sources */,
 				0C309C0682681247017BF4A0 /* OverviewView.swift in Sources */,
 				CD0C0E79662007B8894986AD /* RecordDetailView.swift in Sources */,
 				576327FA5DFC2CCA4FDDA99A /* SignalRecord.swift in Sources */,
@@ -182,7 +191,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthConnectorPoC/HealthConnectorPoC.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = K2QNURVTVU;
 				INFOPLIST_FILE = HealthConnectorPoC/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -261,7 +269,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthConnectorPoC/HealthConnectorPoC.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = K2QNURVTVU;
 				INFOPLIST_FILE = HealthConnectorPoC/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

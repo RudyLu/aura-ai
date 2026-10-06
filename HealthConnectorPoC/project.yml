@@ -21,6 +21,9 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.background-delivery: true
+        # Universal links (https://<host>/link/<token>); the server needs APPLE_TEAM_ID.
+        com.apple.developer.associated-domains:
+          - applinks:aura-web-664697749037.us-central1.run.app
     info:
       path: HealthConnectorPoC/Info.plist
       properties:
@@ -31,6 +34,13 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+        # aura://link?t=<token>&h=<origin> from the Aura web app
+        CFBundleURLTypes:
+          - CFBundleURLName: com.rudy.healthconnectorpoc.aura
+            CFBundleURLSchemes: [aura]
+        # Local dev server (http://localhost:3000, *.local); production is HTTPS.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         NSHealthShareUsageDescription: "PoC: reads sleep, menstrual, diet, vitals and activity samples to test data-collection feasibility."
         NSHealthUpdateUsageDescription: "PoC (simulator only): writes synthetic sample data for testing."
     settings:

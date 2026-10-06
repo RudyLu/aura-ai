@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionId } from '@/server/session';
-import { deleteSession, loadState, saveState } from '@/server/repo';
+import { deleteSession, loadHealthImport, loadState, saveState } from '@/server/repo';
 import { geminiConfigured, MODEL } from '@/server/gemini';
 import type { State } from '@/domain/state';
 
@@ -27,8 +27,8 @@ const MAX_BYTES = 900_000; // Firestore documents are capped at 1 MiB
 
 export async function GET() {
   const sid = await sessionId();
-  const state = await loadState(sid);
-  return NextResponse.json({ state, ai: { enabled: geminiConfigured(), model: geminiConfigured() ? MODEL : null } });
+  const [state, linkedHealth] = await Promise.all([loadState(sid), loadHealthImport(sid)]);
+  return NextResponse.json({ state, linkedHealth, ai: { enabled: geminiConfigured(), model: geminiConfigured() ? MODEL : null } });
 }
 
 export async function PUT(req: Request) {

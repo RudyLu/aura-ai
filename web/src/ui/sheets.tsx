@@ -152,7 +152,7 @@ function DataSheet() {
         </fieldset>
       ) : null}
       <div className="synccard"><span className="synclabel">Sample history<small>Fictional check-ins, coffee, sleep and movement for demos</small></span><Switch act="sample-toggle" on={s.dataSource === 'sample'} label="Sample history" /></div>
-      <details className="realimport"><summary>Use a real Health export</summary><HealthImportControls /></details>
+      <details className="realimport"><summary>Use your real Apple Health data</summary><HealthImportControls /></details>
       {h ? <Btn act="clear-health" cls="text danger">Remove Apple Health data</Btn> : null}
     </>
   );
@@ -168,7 +168,35 @@ function HealthPermSheet() {
       ))}</fieldset>
       <Btn act="health-allow">Allow</Btn><Btn act="close" cls="text">Don’t allow</Btn>
       <ErrorLine />
-      <p className="soft">A browser can’t read Apple Health directly. Allowing loads 30 days of fictional records, labeled “simulated”. For your real data, use an export.xml or the Aura iOS app.</p>
+      <p className="soft">A browser can’t read Apple Health directly. Allowing loads 30 days of fictional records, labeled “simulated”. For your real data, link the Aura iOS app or use an export.xml.</p>
+    </>
+  );
+}
+
+function HealthLinkSheet() {
+  const l = ui.m.link || { status: 'starting' };
+  const iphone = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return (
+    <>
+      <p className="eyebrow">Apple Health · Aura iOS app</p><h2>Link your real Apple Health data</h2>
+      <p>The Aura app reads Apple Health on your iPhone and sends daily totals only to this session: sleep hours, exercise minutes and period dates. You choose which in the app.</p>
+      {l.status === 'starting' ? <p className="soft" role="status">Preparing a link…</p> : null}
+      {l.status === 'waiting' ? (
+        <>
+          {iphone ? <a className="primary linkbutton" href={`${l.appUrl}&r=1`}>Open the Aura app</a> : null}
+          {l.qr ? (
+            <details open={!iphone}><summary>{iphone ? 'Use another iPhone' : 'Scan with your iPhone camera'}</summary>
+              <Raw cls="linkqr" tag="div" html={l.qr} label="QR code that opens the Aura app" />
+              <p className="linkurl soft">{l.url}</p>
+            </details>
+          ) : null}
+          <p className="soft" role="status">Waiting for the Aura app… This page updates by itself. The link works once and expires in 10 minutes.</p>
+        </>
+      ) : null}
+      {l.status === 'expired' ? <><p role="alert">This link has expired.</p><Btn act="health-link">Make a new link</Btn></> : null}
+      {l.status === 'error' ? <><p role="alert">Couldn’t create a link. Check your connection.</p><Btn act="health-link">Try again</Btn></> : null}
+      <p className="soft">No iPhone or no Aura app? Use an export.xml, or keep using simulated data.</p>
+      <Btn act="close" cls="text">Cancel</Btn>
     </>
   );
 }
@@ -450,7 +478,7 @@ function DemoSheet() {
 const SHEETS: Record<string, [string, () => React.ReactNode]> = {
   checkin: ['Check-in', CheckinSheet], food: ['Food', FoodSheet], caffeine: ['Caffeine', CaffeineSheet], addobs: ['Add observation', AddObsSheet],
   demo: ['Demo timeline', DemoSheet], settings: ['Settings', SettingsSheet], legal: ['Terms and privacy', LegalSheet], obsedit: ['Observation', ObsEditSheet],
-  data: ['Data sources', DataSheet], healthperm: ['Health permission', HealthPermSheet], preview: ['Suggested step', PreviewSheet], accept: ['Accept step', AcceptSheet],
+  data: ['Data sources', DataSheet], healthperm: ['Health permission', HealthPermSheet], healthlink: ['Link Apple Health', HealthLinkSheet], preview: ['Suggested step', PreviewSheet], accept: ['Accept step', AcceptSheet],
   feedback: ['Step feedback', FeedbackSheet], review: ['Review', ReviewSheet], done: ['Check-in saved', DoneSheet], history: ['History', HistorySheet], about: ['About', AboutSheet]
 };
 
