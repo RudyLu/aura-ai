@@ -4,3 +4,10 @@
 .bubble.guide.urgent { border: 1px solid #ff8a7a; }
 .saveerror { position: fixed; left: 50%; transform: translateX(-50%); top: calc(10px + env(safe-area-inset-top, 0px)); z-index: 60; background: #5a2020; color: #ffe2dc; padding: 8px 14px; border-radius: 12px; font-size: 13px; max-width: 90vw; }
 .photobuttons label.filebutton { cursor: pointer; }
+
+/* Apple Health link (QR / open the iOS app) */
+.linkpage { padding: 32px 26px; display: grid; gap: 14px; max-width: 520px; margin: 0 auto; }
+.linkbutton { display: block; text-align: center; text-decoration: none; padding: 15px; border-radius: 999px; font-weight: 500; }
+.linkqr { background: #fff; border-radius: 16px; padding: 12px; width: 220px; height: 220px; margin: 8px auto; }
+.linkqr svg { display: block; width: 100%; height: 100%; }
+.linkurl { word-break: break-all; font-size: 12px; text-align: center; }

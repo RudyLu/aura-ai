@@ -6,6 +6,8 @@
 //   1. Apple Health export: Health app › profile › Export All Health Data, unzip, choose
 //      export.xml. Parsed in the browser (streamed); only daily totals are saved.
 //   2. Native bridge for the iOS PoC: `window.AuraHealthBridge` (see bridge()).
+//   3. Linked from the Aura iOS app: the app sends daily totals to the server for this
+//      session (src/server/healthLink.ts); the browser adopts them (via:'ios-app').
 import { addDays, uid } from './dates';
 import { topic } from './topics';
 import { activeObservations, type HealthImport, type Observation, type State, type DataSource } from './state';
@@ -195,7 +197,7 @@ export function daily(s: State, date: string, today: string): Daily {
 }
 
 export const sourceLabel = (src: DataSource, imp: HealthImport | null | undefined) =>
-  src === 'sample' ? 'Sample history' : src === 'apple-health' ? (imp && imp.via === 'simulated' ? 'Apple Health · simulated' : 'Apple Health') : 'Not connected';
+  src === 'sample' ? 'Sample history' : src === 'apple-health' ? (imp && imp.via === 'simulated' ? 'Apple Health · simulated' : imp && imp.via === 'ios-app' ? 'Apple Health · via iOS app' : 'Apple Health') : 'Not connected';
 
 // Prototype stand-in for a HealthKit permission: fictional but realistic
 // daily records for the last 30 days, marked via:'simulated'.

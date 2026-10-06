@@ -8,7 +8,7 @@ A working version of the Aura.ai prototype (Ellie's design, kept in `prototype-r
 | Tapping a sample photo pre-filled fields | Gemini reads the actual photo (sample or your own) and proposes name, note and "caffeinated?"; you confirm before anything is saved |
 | Records in localStorage | Records saved per anonymous visitor session (Firestore); photos in Cloud Storage; reset affects only you |
 | No safety layer | Rules + Gemini classifier before every reply, output check after (PRD §7.3) |
-| Simulated Apple Health | Still available (labeled "simulated"), plus real `export.xml` import parsed in the browser |
+| Simulated Apple Health | Still available (labeled "simulated"), plus real data: link the Aura iOS app (opt-in, from any browser) or import `export.xml` in the browser |
 
 ## Run locally
 
@@ -91,7 +91,10 @@ src/server/
   safety.ts     PRD §7.3 safety floor
   agent.ts      Aura's reply: facts → Gemini → grounding check → fallback
   vision.ts     food photo → fields to confirm
-src/app/api/   session (GET/PUT/DELETE), aura (POST), photo (POST, GET /[id])
+  healthLink.ts one-time Apple Health link tokens and the iOS app's payload
+src/app/api/   session (GET/PUT/DELETE), aura (POST), photo (POST, GET /[id]),
+               health/link (POST, GET /[token]), health/sync (POST, iOS app), health/import (DELETE)
+src/app/link/  /link/<token>: opened from the QR code; hands off to the iOS app
 src/ui/        React port of the prototype's screens; CSS reused verbatim
 ```
 
@@ -114,16 +117,29 @@ Discovery cards are always rendered by code; Gemini never produces the numbers o
 - If the classifier fails, no new step is offered.
 - Aura's own reply is also checked before it's shown.
 
+### Linking real Apple Health (iOS app)
+
+People start in any browser; Apple Health is an opt-in added later. A browser can't read HealthKit, so the iOS app (`../HealthConnectorPoC`) is the connector:
+
+1. Data sources (or setup) › Use your real Apple Health data › **Link with the Aura iOS app**. The server makes a one-time token for this session (10 minutes).
+2. Desktop shows a QR code for `/link/<token>`; on iPhone the button opens `aura://link?t=…&h=…` directly.
+3. The app shows what it will send, asks for HealthKit permission, computes 60 days of daily totals on the phone (sleep via `SleepNights.build`, exercise minutes, period dates) and POSTs them to `/api/health/sync` with the token.
+4. The browser polls the link, adopts the import (`via: 'ios-app'`, labeled "Apple Health · via iOS app") and closes the sheet. A tab opened later picks it up from `GET /api/session`.
+
+The import is stored apart from the browser-owned State (Firestore `healthImports/{sid}`, link tokens in `healthLinks`), so a browser save can't overwrite it. Tokens work once; another session can't read them; reset deletes both.
+
+Optional env: `PUBLIC_URL` (origin used in links, if the proxy headers are wrong), `APPLE_TEAM_ID` (serves `/.well-known/apple-app-site-association` so `/link/<token>` opens the app directly as a universal link; without it the link page shows an "Open the Aura app" button).
+
 ### Data handling
 
 - Sessions are isolated by cookie. Photos are served only to the session that uploaded them.
 - "Delete all records and restart" removes this session's document and photos.
-- Apple Health `export.xml` is parsed in the browser; only daily totals are saved.
+- Apple Health `export.xml` is parsed in the browser; the iOS app computes totals on the phone. Only daily totals are saved.
 - Each session gets a Gemini call budget (`AI_CALLS_PER_HOUR`).
 
 ## Known limits
 
-- Apple Health in the browser is either simulated (labeled) or from an `export.xml` you choose. The iOS PoC (`../HealthConnectorPoC`) can inject `window.AuraHealthBridge` for a live connection; that hookup isn't done yet.
+- Real Apple Health needs the iOS app on the visitor's iPhone (TestFlight or the presenter's phone; App Clips can't use HealthKit). Others use `export.xml` or simulated data. A link sends a one-time snapshot; there's no background resync yet.
 - The grounding check verifies numbers, citations, steps and banned wording; it can't catch every semantic error in free text.
 - The safety rules and copy follow the PRD draft and still need the content review named in PRD §7.3.
 - The demo uses the name "Alex" and fictional records throughout.

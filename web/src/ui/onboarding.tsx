@@ -185,7 +185,7 @@ export function SyncScreen({ on, step }: { on: boolean; step?: boolean }) {
           </fieldset>
         ) : null}
         <Btn act="ob-next" cls="primary syncnext">{on ? 'Continue' : 'Continue without it'}</Btn>
-        <details className="realimport"><summary>Use a real Health export instead</summary><HealthImportControls /></details>
+        <details className="realimport"><summary>Use your real Apple Health data instead</summary><HealthImportControls /></details>
       </div>
     </main>
   );
@@ -195,10 +195,11 @@ export function HealthImportControls() {
   const h = S().healthImport;
   const status = ui.importing !== null
     ? <p className="soft" role="status">Reading export… {Math.round(ui.importing * 100)}%</p>
-    : h && h.via !== 'simulated' ? <div className="callout"><strong>Imported {new Date(h.importedAt).toLocaleDateString()}</strong><br />{healthSummary(h)}<br /><small>{h.via === 'bridge' ? 'Via the Aura app bridge' : `From ${h.fileName}, read in this browser`}</small></div> : null;
+    : h && h.via !== 'simulated' ? <div className="callout"><strong>Imported {new Date(h.importedAt).toLocaleDateString()}</strong><br />{healthSummary(h)}<br /><small>{h.via === 'bridge' ? 'Via the Aura app bridge' : h.via === 'ios-app' ? `Linked from the Aura iOS app${h.fileName ? ` (${h.fileName})` : ''}` : `From ${h.fileName}, read in this browser`}</small></div> : null;
   return (
     <div className="healthimport">
-      {hasBridge() ? <Btn act="health-bridge" cls="smallaction">{h ? 'Refresh from Apple Health' : 'Connect Apple Health'}</Btn> : null}
+      {hasBridge() ? <Btn act="health-bridge" cls="smallaction">{h ? 'Refresh from Apple Health' : 'Connect Apple Health'}</Btn>
+        : <Btn act="health-link" cls="smallaction">{h && h.via === 'ios-app' ? 'Link again with the Aura iOS app' : 'Link with the Aura iOS app'}</Btn>}
       <label className="filebutton">{h && h.via !== 'simulated' ? 'Import a newer export.xml' : 'Choose export.xml'}
         <input type="file" accept=".xml,text/xml,application/xml" onChange={e => { const f = e.target.files?.[0]; if (f) runHealthImport(f); e.target.value = ''; }} /></label>
       <details><summary>How to get export.xml</summary><p className="soft">On iPhone: Health › your profile picture › Export All Health Data. Unzip the file and choose <b>export.xml</b>. It is read in this browser; only daily totals (sleep hours, exercise minutes, period dates) are saved to your session.</p></details>

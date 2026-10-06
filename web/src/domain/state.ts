@@ -41,7 +41,7 @@ export interface Message {
 }
 export interface HealthImport {
   sleep: Record<string, number>; activity: Record<string, number>; cycle: string[];
-  range: [string, string] | null; via: 'export-xml' | 'bridge' | 'simulated'; importedAt: string;
+  range: [string, string] | null; via: 'export-xml' | 'bridge' | 'ios-app' | 'simulated'; importedAt: string;
   records: number | null; fileName?: string; granted?: string[];
 }
 export interface Profile {

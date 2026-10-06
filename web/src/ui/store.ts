@@ -2,7 +2,8 @@
 // interface state (`ui`, never saved), as in the prototype's app.js. Event handlers
 // mutate them and call render(); components read them through useApp().
 import { useSyncExternalStore } from 'react';
-import { blank, type Entry, type PhotoExtraction, type State, type StepDraft } from '@/domain/state';
+import { blank, type Entry, type HealthImport, type PhotoExtraction, type State, type StepDraft } from '@/domain/state';
+import { setDataSource } from '@/domain/health';
 import type { TopicId } from '@/domain/topics';
 import { todayISO } from '@/domain/dates';
 
@@ -16,6 +17,7 @@ export interface ModalData {
   time?: string; note?: string; name?: string; drink?: string; size?: string; caffeine?: boolean; target?: string;
   topicId?: TopicId; from?: string | null; picking?: boolean; photo?: string; extraction?: PhotoExtraction | null;
   reading?: boolean; photoError?: string; fill?: number;
+  link?: { status: 'starting' | 'waiting' | 'expired' | 'error'; token?: string; url?: string; appUrl?: string; qr?: string; expiresAt?: number };
 }
 export interface UI {
   ready: boolean; page: 'splash' | 'onboarding' | 'app'; tab: 'today' | 'explore' | 'aura';
@@ -82,9 +84,11 @@ export async function flush() {
 export async function load() {
   try {
     const res = await fetch('/api/session');
-    const { state, ai } = await res.json();
+    const { state, ai, linkedHealth } = await res.json();
     if (state && state.v === 2) st = Object.assign(blank(), state);
     ui.ai = ai;
+    // Apple Health sent by the iOS app while this tab was closed (or from another tab).
+    if (linkedHealth && adoptLinked(st, linkedHealth)) save();
   } catch { /* start blank; saving will report problems */ }
   ui.page = st.onboarded ? 'app' : 'splash';
   ui.ready = true;
@@ -94,6 +98,15 @@ export async function load() {
 export async function resetAll() {
   await fetch('/api/session', { method: 'DELETE' });
   st = blank();
+}
+
+// Use Apple Health from the iOS app unless the session already has it or something newer
+// (for example an export.xml imported afterwards).
+export function adoptLinked(s: State, h: HealthImport) {
+  if (s.healthImport && s.healthImport.importedAt >= h.importedAt) return false;
+  s.healthImport = h;
+  if (s.onboarded) setDataSource(s, 'apple-health', todayISO());
+  return true;
 }
 
 export const photoOf = (r: Entry) => r.photoUrl || null;

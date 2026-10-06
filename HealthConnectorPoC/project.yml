@@ -6,6 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.1"        # CFBundleShortVersionString
+    CURRENT_PROJECT_VERSION: "2"    # CFBundleVersion; increase for every TestFlight upload
     DEVELOPMENT_TEAM: ""
     ENABLE_DEBUG_DYLIB: NO
     TARGETED_DEVICE_FAMILY: "1"
@@ -21,16 +23,28 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.background-delivery: true
+        # Universal links (https://<host>/link/<token>); the server needs APPLE_TEAM_ID.
+        com.apple.developer.associated-domains:
+          - applinks:aura-web-664697749037.us-central1.run.app
     info:
       path: HealthConnectorPoC/Info.plist
       properties:
         CFBundleDisplayName: Health PoC
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+        # aura://link?t=<token>&h=<origin> from the Aura web app
+        CFBundleURLTypes:
+          - CFBundleURLName: com.rudy.healthconnectorpoc.aura
+            CFBundleURLSchemes: [aura]
+        # Local dev server (http://localhost:3000, *.local); production is HTTPS.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         NSHealthShareUsageDescription: "PoC: reads sleep, menstrual, diet, vitals and activity samples to test data-collection feasibility."
         NSHealthUpdateUsageDescription: "PoC (simulator only): writes synthetic sample data for testing."
     settings:

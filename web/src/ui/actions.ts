@@ -8,7 +8,7 @@ import { buildDemo } from '@/domain/demo';
 import { bridge, importExportFile, importFromBridge, seedSample, setDataSource, simulateAppleHealth } from '@/domain/health';
 import {
   acceptPlan, activeObservations, addObservation, blank, currentPlans, dayCheckin, observation, plan as findPlan,
-  removeRecord, saveCheckin, saveEntry, setPlanStatus, type CheckinStatus, type Feedback, type Message, type PhotoExtraction, type StepDraft
+  removeRecord, saveCheckin, saveEntry, setPlanStatus, type CheckinStatus, type Feedback, type HealthImport, type Message, type PhotoExtraction, type StepDraft
 } from '@/domain/state';
 import { GOALS, topic, type TopicId } from '@/domain/topics';
 import { flush, render, resetAll, S, save, setSt, toast, today, ui, type ModalData } from './store';
@@ -94,16 +94,19 @@ function finishOnboarding() {
 }
 
 // ---------- Apple Health ----------
+function applyHealthImport(h: HealthImport) {
+  const s = S();
+  s.healthImport = h;
+  if (ui.ob) ui.ob.data = 'apple-health'; else setDataSource(s, 'apple-health', today());
+  save();
+}
 export async function runHealthImport(file: File) {
   ui.importing = 0; ui.err = null; render();
   try {
     let last = 0;
     const h = await importExportFile(file, p => { if (p - last > 0.05) { last = p; ui.importing = p; render(); } });
-    const s = S();
-    s.healthImport = h;
     ui.importing = null;
-    if (ui.ob) ui.ob.data = 'apple-health'; else setDataSource(s, 'apple-health', today());
-    save(); render();
+    applyHealthImport(h); render();
     toast('Apple Health records imported');
   } catch (e) {
     ui.importing = null;
@@ -114,12 +117,52 @@ async function runBridgeImport() {
   const s = S();
   const types = Object.entries(ui.ob ? ui.ob.types : s.healthTypes).filter(([, v]) => v).map(([k]) => k);
   try {
-    s.healthImport = await importFromBridge(types, addDays(today(), -60), today());
-    if (ui.ob) ui.ob.data = 'apple-health'; else setDataSource(s, 'apple-health', today());
-    save(); render(); toast('Apple Health connected');
+    applyHealthImport(await importFromBridge(types, addDays(today(), -60), today()));
+    render(); toast('Apple Health connected');
   } catch (e) { err(e instanceof Error ? e.message : 'Apple Health is not available.'); }
 }
 export const hasBridge = () => !!bridge();
+
+// Link real Apple Health through the Aura iOS app: a one-time link shown as a QR code
+// (desktop) or an "Open the Aura app" button (iPhone). The app sends daily totals to
+// this session; this sheet polls until they arrive.
+async function startHealthLink(el?: HTMLElement | null) {
+  openModal('healthlink', { back: ui.modal === 'data' ? 'data' : undefined, link: { status: 'starting' } }, el);
+  render();
+  const seqAt = ui.modalSeq;
+  try {
+    const res = await fetch('/api/health/link', { method: 'POST' });
+    if (!res.ok) throw new Error();
+    const l: { token: string; url: string; appUrl: string; expiresAt: number } = await res.json();
+    const { default: QRCode } = await import('qrcode');
+    const qr = await QRCode.toString(l.url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    if (ui.modalSeq !== seqAt) return;
+    ui.m.link = { ...l, qr, status: 'waiting' };
+    render();
+    pollHealthLink(seqAt, l.token, l.expiresAt);
+  } catch {
+    if (ui.modalSeq === seqAt) { ui.m.link = { status: 'error' }; render(); }
+  }
+}
+function pollHealthLink(seqAt: number, token: string, expiresAt: number) {
+  const tick = async () => {
+    if (ui.modalSeq !== seqAt) return; // sheet closed: stop
+    if (Date.now() > expiresAt) { ui.m.link!.status = 'expired'; render(); return; }
+    try {
+      const res = await fetch(`/api/health/link/${token}`);
+      const out: { status?: string; import?: HealthImport | null } = await res.json();
+      if (ui.modalSeq !== seqAt) return;
+      if (out.status === 'done' && out.import) {
+        applyHealthImport(out.import);
+        close(); render(); toast('Apple Health connected');
+        return;
+      }
+      if (out.status === 'expired' || res.status === 404) { ui.m.link!.status = 'expired'; render(); return; }
+    } catch { /* offline for a moment: keep trying until the link expires */ }
+    setTimeout(tick, 2000);
+  };
+  setTimeout(tick, 2000);
+}
 
 // ---------- food photos: Gemini proposes, the user confirms ----------
 export async function readPhoto(body: FormData) {
@@ -273,6 +316,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'ob-type': ui.ob!.types[v as 'sleep'] = d.checked === '1'; break;
     case 'toggle-type': s.healthTypes[v as 'sleep'] = d.checked === '1'; save(); break;
     case 'health-bridge': runBridgeImport(); return;
+    case 'health-link': startHealthLink(el); return;
 
     // check-ins
     case 'scale-range': {
@@ -418,7 +462,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       setDataSource(s, s.dataSource === 'sample' ? 'none' : 'sample', today()); save();
       toast(s.dataSource === 'sample' ? 'Sample history on' : 'Sample history off');
       break;
-    case 'clear-health': if (!confirmTap(key)) return; s.healthImport = null; if (s.dataSource === 'apple-health') setDataSource(s, 'none', today()); save(); break;
+    case 'clear-health': if (!confirmTap(key)) return; fetch('/api/health/import', { method: 'DELETE' }).catch(() => {}); s.healthImport = null; if (s.dataSource === 'apple-health') setDataSource(s, 'none', today()); save(); break;
 
     // Aura & plans
     case 'prompt': sendToAura(v!); return;
