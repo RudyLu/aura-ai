@@ -47,7 +47,27 @@ export const today = () => todayISO();
 // ---------- render loop ----------
 let version = 0;
 const listeners = new Set<() => void>();
-export function render() { version++; listeners.forEach(l => l()); }
+export function render() { version++; keepDraft(); listeners.forEach(l => l()); }
+
+// The onboarding answers live only in memory, so a reload (for example Safari coming back
+// from the Aura iOS app after linking Apple Health) would start the user over. Keep them in
+// this browser until onboarding finishes. They are never sent to the server.
+const DRAFT_KEY = 'aura_onboarding_draft';
+function keepDraft() {
+  try {
+    if (!ui.ready) return;
+    if (ui.page === 'onboarding' && ui.ob) localStorage.setItem(DRAFT_KEY, JSON.stringify({ ob: ui.ob, step: ui.step, fromReview: ui.fromReview, at: Date.now() }));
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch { /* storage unavailable: onboarding just won't survive a reload */ }
+}
+function restoreDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (!d?.ob || Date.now() - d.at > 24 * 60 * 60 * 1000) return false;
+    ui.ob = d.ob; ui.step = d.step; ui.fromReview = !!d.fromReview; ui.page = 'onboarding';
+    return true;
+  } catch { return false; }
+}
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
 export function useApp() { useSyncExternalStore(subscribe, () => version, () => 0); return { st, ui }; }
 
@@ -91,6 +111,7 @@ export async function load() {
     if (linkedHealth && adoptLinked(st, linkedHealth)) save();
   } catch { /* start blank; saving will report problems */ }
   ui.page = st.onboarded ? 'app' : 'splash';
+  if (!st.onboarded) restoreDraft();
   ui.ready = true;
   render();
 }
