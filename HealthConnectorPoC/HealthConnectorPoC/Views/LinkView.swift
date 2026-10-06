@@ -45,7 +45,12 @@ struct LinkView: View {
             Label("Sent \(r.nights ?? 0) nights · \(r.activeDays ?? 0) active days · \(r.periodDates ?? 0) period dates", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
             if link.returnToBrowser {
-                Button("Back to Aura") { UIApplication.shared.open(link.origin); dismiss() }
+                // iOS shows a "‹ Safari" control at the top left when this app was opened from a Safari link.
+                // Using it returns to the same tab; opening the URL here would start a new one.
+                Text("Tap ‹ Safari at the top left of the screen to go back to Aura.").foregroundStyle(.secondary)
+                Button("Done") { dismiss() }
+                Button("Can’t see it? Open Aura in Safari") { UIApplication.shared.open(link.origin); dismiss() }
+                    .font(.footnote)
             } else {
                 Text("Your browser updates by itself.").foregroundStyle(.secondary)
                 Button("Done") { dismiss() }
