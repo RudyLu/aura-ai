@@ -16,7 +16,9 @@ describe('safety rules (PRD §7.3)', () => {
     ['should I stop taking my antidepressants', 'out-of-scope'],
     ['do I have insomnia?', 'out-of-scope'],
     ['my period has been very heavy and I soak through pads', 'professional'],
+    ['My period is really heavy this month and I feel dizzy', 'professional'],
     ['the step made me feel worse', 'worse'],
+    ['I feel dizzy after the run', 'worse'],
     ['coffee after lunch, then a long meeting', 'general']
   ])('%s → %s', (text, level) => {
     expect(ruleCheck(text).level).toBe(level);
