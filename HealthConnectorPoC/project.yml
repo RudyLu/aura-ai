@@ -6,6 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.1"        # CFBundleShortVersionString
+    CURRENT_PROJECT_VERSION: "2"    # CFBundleVersion; increase for every TestFlight upload
     DEVELOPMENT_TEAM: ""
     ENABLE_DEBUG_DYLIB: NO
     TARGETED_DEVICE_FAMILY: "1"
@@ -28,6 +30,8 @@ targets:
       path: HealthConnectorPoC/Info.plist
       properties:
         CFBundleDisplayName: Health PoC
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
