@@ -199,6 +199,7 @@ export async function sendToAura(text: string) {
   s.messages.push({ role: 'user', text });
   ui.pending = true; ui.auraState = 'understanding'; ui.page = 'app'; ui.tab = 'aura'; ui.logOffer = null; ui.draft = null;
   close(); save(); render();
+  requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
   let reply: { text: string; action: Message['action']; draft: StepDraft | null; logOffer: typeof ui.logOffer; via: NonNullable<Message['meta']>['via']; cited?: string[]; safety?: { level: string }; stopPlanId?: string | null };
   try {
     await flush();

@@ -1,6 +1,6 @@
 'use client';
 // Aura chat (ported from views.js chat()). Replies come from /api/aura.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { activeObservations, currentPlans, plan as findPlan, type Message, type Plan } from '@/domain/state';
 import { topic } from '@/domain/topics';
 import { AuraMark, Btn } from './core';
@@ -59,6 +59,22 @@ function suggestions(): [string, string, string, Record<string, string>?][] {
   return [['I’m working late this week', 'prompt', 'I’m working late this week'], ['I want energy for exercise', 'prompt', 'I want energy for exercise']];
 }
 
+// Shown in place of Aura's next message while /api/aura works. The note follows what the
+// server actually does (safety check, records, grounding check) and reassures on long waits.
+const WAIT_NOTES: [number, string][] = [[0, 'Reading your message…'], [3, 'Looking through your records…'], [7, 'Checking the reply against your records…'], [14, 'Still working on it. Thanks for waiting.']];
+function TypingBubble() {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => { const t = setInterval(() => setSecs(n => n + 1), 1000); return () => clearInterval(t); }, []);
+  const note = WAIT_NOTES.filter(([at]) => secs >= at).at(-1)![1];
+  return (
+    <div className="bubble guide typing-bubble" role="status">
+      <span className="speaker">Aura</span>
+      <span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
+      <span className="typing-note">{note}</span>
+    </div>
+  );
+}
+
 export function Aura() {
   const s = S();
   const [text, setText] = useState('');
@@ -84,8 +100,8 @@ export function Aura() {
             <div className="tags"><span>{d.duration}</span><span>{d.days}</span></div>
             <Btn act="open" val="preview">See this small step</Btn><Btn act="observe" cls="text">Just observe for now</Btn></div>
         ) : null}
+        {ui.pending ? <TypingBubble /> : null}
       </div>
-      {ui.pending ? <p className="aura-understanding" role="status">Aura is putting your words in context.</p> : null}
       {offer ? (
         <div className="aura-log-offer"><p>Keep one detail from your day?</p>
           {offer.name ? <Btn act="log-offer" cls="smallaction">{`Record the ${offer.name.toLowerCase()}`}</Btn> : <Btn act="log-offer" cls="smallaction">Log food or a drink</Btn>}
@@ -98,7 +114,7 @@ export function Aura() {
           <textarea id="message" placeholder="What has today felt like?" rows={1} required value={text} maxLength={2000}
             onChange={e => { setText(e.target.value); if (!ui.pending) ui.auraState = e.target.value ? 'listening' : 'idle'; }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} />
-          <button aria-label="Send message" type="submit" disabled={ui.pending}>↑</button>
+          <button aria-label={ui.pending ? 'Waiting for Aura' : 'Send message'} type="submit" disabled={ui.pending} aria-busy={ui.pending}>↑</button>
         </form>
         <small className="footnote">{ui.ai.enabled ? 'Replies by Gemini, checked against your records. Not medical advice.' : 'AI is off here: preset replies. Not medical advice.'}</small>
       </div>
