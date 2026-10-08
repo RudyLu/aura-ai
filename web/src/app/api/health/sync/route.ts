@@ -4,7 +4,7 @@ import { linkState, SyncSchema, TOKEN, toHealthImport } from '@/server/healthLin
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BYTES = 100_000;
+const MAX_BYTES = 900_000;
 
 // Called by the Aura iOS app (no cookie): `Authorization: Bearer <link token>` and the
 // daily totals it computed on the phone. Each token works once, for 10 minutes.
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (state !== 'pending') return NextResponse.json({ error: 'This link has expired or was already used. Start again from Aura in your browser.' }, { status: 410 });
 
   const raw = await req.text();
-  if (raw.length > MAX_BYTES) return NextResponse.json({ error: 'Too much data' }, { status: 413 });
+  if (Buffer.byteLength(raw) > MAX_BYTES) return NextResponse.json({ error: 'Too much data' }, { status: 413 });
   let body: unknown;
   try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const parsed = SyncSchema.safeParse(body);

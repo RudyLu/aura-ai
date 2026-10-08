@@ -1,6 +1,6 @@
 // Topic definitions (ported from topics.js). Each observation topic owns its question,
 // its five scale labels, the construct it measures, its timing and its missing/skip wording.
-export type TopicId = 'evening-energy' | 'rested-waking' | 'afternoon-sleepiness';
+export type TopicId = 'evening-energy' | 'rested-waking' | 'afternoon-sleepiness' | 'stress' | 'productivity';
 export interface Topic {
   id: TopicId; name: string; construct: string; icon: string; question: string; shortQuestion: string;
   checkinName: string; labels: string[]; lead: string; direction: string; higherIsBetter: boolean;
@@ -37,7 +37,7 @@ export const TOPICS: Record<TopicId, Topic> = {
   },
   'rested-waking': {
     id: 'rested-waking',
-    name: 'Feeling rested on waking',
+    name: 'Rested on waking',
     construct: 'Restedness',
     icon: '☾',
     question: 'How rested do you feel right now, after your main sleep?',
@@ -82,14 +82,33 @@ export const TOPICS: Record<TopicId, Topic> = {
     missing: 'No afternoon check-in',
     unknown: 'Not sure how sleepy I feel',
     skip: 'Skipped this afternoon'
+  },
+  stress: {
+    id: 'stress', name: 'Perceived stress', construct: 'Perceived stress', icon: '≈',
+    question: 'How stressed have you felt today?', shortQuestion: 'Stress today', checkinName: 'perceived-stress check-in',
+    labels: ['Not stressed', 'A little stressed', 'Somewhat stressed', 'Quite stressed', 'Very stressed'],
+    lead: 'Today, I felt', direction: 'Higher means more stressed.', higherIsBetter: false,
+    timing: { label: 'End of your day', window: [17, 23], defaultTime: '21:30', hint: 'Looking back over the day up to this check-in.' },
+    dateRule: 'The day you are describing.', summary: 'A short check-in at the end of your day.',
+    missing: 'No perceived-stress check-in', unknown: 'Not sure how stressed I felt', skip: 'Skipped today'
+  },
+  productivity: {
+    id: 'productivity', name: 'Productivity', construct: 'Perceived productivity', icon: '✓',
+    question: 'How productive did today feel?', shortQuestion: 'How productive today felt', checkinName: 'productivity check-in',
+    labels: ['Not productive', 'A little productive', 'Somewhat productive', 'Quite productive', 'Very productive'],
+    lead: 'Today felt', direction: 'Higher means more productive as perceived.', higherIsBetter: true,
+    timing: { label: 'After your work day', window: [16, 23], defaultTime: '18:30', hint: 'When your main work for the day is done.' },
+    dateRule: 'The day you are describing.', summary: 'A short check-in after your work day.',
+    missing: 'No productivity check-in', unknown: 'Not sure how productive it felt', skip: 'Skipped today'
   }
+
 };
 
 export const GOALS = [
   { id: 'evening-energy', label: 'More energy after work', topicId: 'evening-energy' },
   { id: 'rested', label: 'Feel rested when I wake up', topicId: 'rested-waking' },
   { id: 'afternoon', label: 'Stay awake in the afternoon', topicId: 'afternoon-sleepiness' },
-  { id: 'balance', label: 'Find balance on busy days', topicId: 'evening-energy' }
+  { id: 'balance', label: 'Find balance on busy days', topicId: null }
 ];
 
 // Setup question 1: what has been getting in the way lately (multi-select).
@@ -101,7 +120,7 @@ export const CONCERN_GROUPS: ConcernGroup[] = [
     { id: 'irregular', goal: 'Keep steadier sleep times', label: 'Irregular sleep times', w: { 'rested-waking': 2, 'afternoon-sleepiness': 1 } }] },
   { id: 'alertness', label: 'Alertness', items: [
     { id: 'slump', goal: 'Get through the afternoon', label: 'Afternoon slump', w: { 'afternoon-sleepiness': 3 } },
-    { id: 'focus', goal: 'Focus more easily', label: 'Hard to focus', w: { 'afternoon-sleepiness': 2 } },
+    { id: 'focus', goal: 'Focus more easily', label: 'Hard to focus', w: { productivity: 3, 'afternoon-sleepiness': 1 } },
     { id: 'caffeine', goal: 'Rely less on caffeine', label: 'Relying on caffeine', w: { 'afternoon-sleepiness': 2, 'evening-energy': 1 } }] },
   { id: 'energy', label: 'Energy', items: [
     { id: 'drained', goal: 'Have energy after work', label: 'Drained after work', w: { 'evening-energy': 3 } },
@@ -110,7 +129,7 @@ export const CONCERN_GROUPS: ConcernGroup[] = [
     { id: 'too-tired-exercise', goal: 'Have energy to exercise', label: 'Too tired to exercise', w: { 'evening-energy': 2 } },
     { id: 'inactive', goal: 'Stay active', label: 'Hard to stay active', w: { 'evening-energy': 1 } }] },
   { id: 'mood', label: 'Mood', items: [
-    { id: 'stressed', goal: 'Feel less tense', label: 'Stressed or tense', w: { 'evening-energy': 1, 'rested-waking': 1 } },
+    { id: 'stressed', goal: 'Feel less tense', label: 'Stressed or tense', w: { stress: 3, 'evening-energy': 1 } },
     { id: 'low-mood', goal: 'Lift your mood', label: 'Low mood', w: { 'evening-energy': 1 } }] }
 ];
 export const CONCERNS: Record<string, Concern & { group: string }> = Object.fromEntries(CONCERN_GROUPS.flatMap(g => g.items.map(i => [i.id, Object.assign({ group: g.id }, i)])));
@@ -126,6 +145,16 @@ export function rankTopics(concernIds: string[] = []) {
 
 
 export const TOPIC_IDS = Object.keys(TOPICS) as TopicId[];
-export const topic = (id: string | null | undefined): Topic => TOPICS[id as TopicId] || TOPICS['evening-energy'];
+export const isTopicId = (id: unknown): id is TopicId => typeof id === 'string' && Object.hasOwn(TOPICS, id);
+// Null is a UI placeholder only. Business logic must call requireTopic.
+export const topic = (id: string | null | undefined): Topic => id == null ? TOPICS['evening-energy'] : requireTopic(id);
+export function requireTopic(id: string): Topic {
+  if (!isTopicId(id)) throw new Error('Unknown topic');
+  return TOPICS[id];
+}
+export const TOPIC_CATALOG_VERSION = 'topics.2026-10-07.v1.2';
+export const topicDefinition = (id: TopicId) => ({ ...requireTopic(id), version: TOPIC_CATALOG_VERSION,
+  metricId: `self-report:${id}`, analysisStatus: ['stress', 'productivity'].includes(id) ? 'not_configured' : 'enabled',
+  allowedActionIds: [`observe:${id}`, 'context:caffeine'] });
 export const scaleLabel = (topicId: string, score: number | null | undefined) =>
   score === null || score === undefined ? null : `${score} · ${topic(topicId).labels[score - 1]}`;

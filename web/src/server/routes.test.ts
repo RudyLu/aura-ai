@@ -1,0 +1,102 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { blank, addObservation, saveCheckin, saveEntry } from '@/domain/state';
+import { buildDemo } from '@/domain/demo';
+import { stepDraft } from '@/domain/uiSteps';
+const identity = vi.hoisted(() => ({ sid:'route-user' }));
+vi.mock('./session', () => ({sessionId:async()=>identity.sid}));
+vi.mock('./gemini', () => ({geminiConfigured:()=>false,generationMeta:()=>undefined,MODEL:'disabled',generateJSON:vi.fn()}));
+let dir:string, repo:typeof import('./repo'), session:typeof import('@/app/api/session/route'), commands:typeof import('@/app/api/command/route'), reviews:typeof import('@/app/api/review/route');
+const request = (endpoint:string, body?:unknown, mode='personal') => new Request(`http://localhost/api/${endpoint}?mode=${mode}`,{method:body ? 'POST' : 'GET',...(body ? {headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {})});
+const cmd = (action:string,inputRevision:number,data:Record<string,unknown>,mode='demo') => commands.POST(request('command',{action,inputRevision,data},mode));
+beforeAll(async()=>{dir=mkdtempSync(path.join(os.tmpdir(),'aura-v2-api-'));process.env.DATA_DIR=dir;process.env.STORAGE='file';repo=await import('./repo');session=await import('@/app/api/session/route');commands=await import('@/app/api/command/route');reviews=await import('@/app/api/review/route');});
+afterAll(()=>{rmSync(dir,{recursive:true,force:true});delete process.env.DATA_DIR;});
+beforeEach(()=>{identity.sid=`user-${Math.random().toString(36).slice(2)}`;});
+describe('real file-backed routes and visitor/mode isolation',()=>{
+  it('demo commands never replace personal records and another visitor cannot read them',async()=>{
+    const personal=blank();const o=addObservation(personal,'stress');saveCheckin(personal,{observationId:o.id,topicId:'stress',status:'recorded',score:4,occurredAt:'2026-10-01T21:00'});await repo.saveState(identity.sid,personal);
+    const res=await cmd('demo',0,{day:10,now:'2026-10-08T00:30:00Z',timezone:'Asia/Taipei'});expect(res.status).toBe(200);
+    expect((await repo.loadState(identity.sid))!.checkins).toEqual(personal.checkins);
+    expect((await repo.loadState(`${identity.sid}-demo`))!.mode).toBe('demo');
+    identity.sid='another-visitor';expect((await (await session.GET(request('session',undefined,'demo'))).json()).state.checkins).toEqual([]);
+  });
+  it('legacy single-slot demo is archived even if demo slot already exists',async()=>{
+    const legacy=buildDemo(4);await repo.saveState(identity.sid,legacy);await repo.saveState(`${identity.sid}-demo`,buildDemo(10));
+    const out=await (await session.GET(request('session'))).json();expect(out.state.plans).toEqual([]);expect((await repo.loadState(`${identity.sid}-legacy-demo`))!.plans).toEqual(legacy.plans);
+    expect((await repo.loadState(`${identity.sid}-demo`))!.demo!.day).toBe(10);
+  });
+  it('rejects client plan/safety/review forgery while saving real records',async()=>{
+    const s=blank(),o=addObservation(s,'productivity');await repo.saveState(identity.sid,s);const incoming=structuredClone(s);saveEntry(incoming,{kind:'food',name:'Lunch',occurredAt:'2026-10-01T12:00'});
+    incoming.plans=buildDemo(10).plans;incoming.aiReviews=[{id:'fake'} as never];incoming.safetyEvents=[{id:'fake'} as never];
+    const res=await session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state:incoming})}));expect(res.status).toBe(200);const saved=(await res.json()).state;expect(saved.plans).toEqual([]);expect(saved.safetyEvents).toEqual([]);expect(saved.entries[0].origin).toBe('personal');expect(saved.observations[0].id).toBe(o.id);
+  });
+  it('only one concurrent command at a revision is saved',async()=>{
+    await repo.saveState(`${identity.sid}-demo`,buildDemo(10));const s=(await repo.loadState(`${identity.sid}-demo`))!,p=s.plans[0];
+    const results=await Promise.all([cmd('decide',0,{planId:p.id,planVersion:1,choice:'observe'}),cmd('decide',0,{planId:p.id,planVersion:1,choice:'stop'})]);expect(results.map(r=>r.status).sort()).toEqual([200,409]);expect((await repo.loadState(`${identity.sid}-demo`))!.decisions).toHaveLength(1);
+  });
+  it('existing worse-feedback pause is saved and observation clears the presentation hold',async()=>{
+    const s=buildDemo(10),p=s.plans[0];await repo.saveState(`${identity.sid}-demo`,s);
+    const fb=await cmd('feedback',0,{id:'worse',planId:p.id,planVersion:1,date:'2026-10-08',occurredAt:'2026-10-08T10:00',execution:'Done',answer:'unknown',change:'Worse',barriers:[],note:''});expect(fb.status).toBe(200);
+    const current=(await fb.json()).state;expect(current.plans[0].status).toBe('stopped');expect(current.plans[0].safetyHold).toBeDefined();
+    expect((await cmd('decide',1,{planId:p.id,planVersion:1,choice:'continue'})).status).toBe(400);
+    expect((await cmd('accept',1,{topicId:p.topicId,observationId:p.observationId,stepId:'chat:busy-week',step:stepDraft('chat:busy-week',p.topicId)!.step,start:'2026-10-08',review:'2026-10-14'})).status).toBe(400);
+    expect((await cmd('decide',1,{planId:p.id,planVersion:1,choice:'observe'})).status).toBe(200);
+    expect((await repo.loadState(`${identity.sid}-demo`))!.plans[0].safetyHold?.resolvedAt).toBeDefined();
+  });
+  it('a proposal-free review cannot fall back to a different step, and stale proposals reject',async()=>{
+    const s=buildDemo(10),p=s.plans[0];s.aiReviews=[{id:'r',contract:'aura.review.v1',requestId:'q',planId:p.id,planVersion:1,inputRevision:0,mode:'demo',feedbackIds:[],summary:'Observe',recommendation:'observe',reasons:['No new step'],proposal:null,safety:{pause:false},via:'gemini',at:'now'}];await repo.saveState(`${identity.sid}-demo`,s);
+    const data={planId:p.id,aiReviewId:'r',requestId:'q',topicId:p.topicId,observationId:p.observationId,stepId:'chat:busy-week',start:'2026-10-08',review:'2026-10-14'};
+    expect((await cmd('accept',0,data)).status).toBe(400);
+    s.inputRevision=1;await repo.saveState(`${identity.sid}-demo`,s);expect((await cmd('accept',1,data)).status).toBe(409);
+  });
+  it('a confirmed server-owned review retains lineage, prior feedback and decision history',async()=>{
+    const s=buildDemo(10),p=s.plans[0],proposal=stepDraft('chat:busy-week',p.topicId)!;
+    s.aiReviews=[{id:'approved-test-review',contract:'aura.review.v1',requestId:'approved-test-request',planId:p.id,planVersion:p.version,inputRevision:0,mode:'demo',feedbackIds:s.feedbacks.map(f=>f.id),summary:'Isolated fixture, not AI',recommendation:'adjust',reasons:['Test confirmation'],proposal,safety:{pause:false},via:'gemini',at:'now'}];
+    await repo.saveState(`${identity.sid}-demo`,s);
+    const response=await cmd('accept',0,{planId:p.id,aiReviewId:'approved-test-review',requestId:'approved-test-request',topicId:p.topicId,observationId:p.observationId,start:'2026-10-08',review:'2026-10-14'});
+    expect(response.status).toBe(200);const saved=(await response.json()).state;
+    const next=saved.plans.at(-1);expect(next.lineageId).toBe(p.lineageId);expect(next.version).toBe(p.version+1);expect(next.basedOn.aiReviewId).toBe('approved-test-review');
+    expect(saved.plans.find((x:{id:string})=>x.id===p.id).status).toBe('replaced');expect(saved.feedbacks).toEqual(s.feedbacks);expect(saved.decisions.at(-1).newPlanId).toBe(next.id);
+  });
+  it('foreign observation, unapproved and edited actions never activate a plan',async()=>{
+    const s=buildDemo(10),p=s.plans[0];await repo.saveState(`${identity.sid}-demo`,s);
+    const data={topicId:p.topicId,observationId:p.observationId,stepId:'chat:busy-week',start:'2026-10-08',review:'2026-10-14'};
+    expect((await cmd('accept',0,{...data,observationId:'foreign'})).status).toBe(400);
+    expect((await cmd('accept',0,{...data,stepId:'not-in-catalog'})).status).toBe(400);
+    expect((await cmd('accept',0,{...data,step:'Drink more caffeine'})).status).toBe(400);
+    expect((await repo.loadState(`${identity.sid}-demo`))!.plans).toHaveLength(s.plans.length);
+  });
+  it('unconfigured Gemini is explicit and saves no fabricated result',async()=>{
+    const s=buildDemo(10),p=s.plans[0];await repo.saveState(`${identity.sid}-demo`,s);
+    const response=await reviews.POST(request('review',{planId:p.id,planVersion:1,inputRevision:0,requestId:'real-api-request',today:'2026-10-08'},'demo'));expect((await response.json()).status).toBe('not-integrated');expect((await repo.loadState(`${identity.sid}-demo`))!.aiReviews).toEqual([]);
+  });
+  it('rejects invalid, mismatched and future record times, but words-only does not create a score',async()=>{
+    const s=blank(),o=addObservation(s,'stress');s.timezone='UTC';saveCheckin(s,{observationId:o.id,topicId:'stress',status:'text-only',score:null,note:'Busy and tense',occurredAt:'2026-10-01T20:00'});
+    const put=(state:typeof s)=>session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state})}));
+    expect((await put(s)).status).toBe(200);s.inputRevision=1;s.checkins[0].occurredAt='2026-02-30T20:00';expect((await put(s)).status).toBe(400);
+    s.checkins[0].occurredAt='2099-01-01T20:00';s.checkins[0].date='2099-01-01';expect((await put(s)).status).toBe(400);
+    expect((await repo.loadState(identity.sid))!.checkins[0].score).toBeNull();
+  });
+  it('linked-health refresh advances review revision and preserves existing records',async()=>{
+    const s=buildDemo(10);s.mode='personal';s.demo=null;await repo.saveState(identity.sid,s);
+    const token='token-refresh';await repo.createLink({token,sid:identity.sid,status:'pending',expiresAt:Date.now()+60000});
+    const h={...s.healthImport!,via:'ios-app' as const,importedAt:new Date().toISOString()};expect(await repo.completeLink(token,h)).toBe(true);
+    const next=(await repo.loadState(identity.sid))!;expect(next.inputRevision).toBe(1);expect(next.checkins).toMatchObject(s.checkins);expect(next.healthImport).toEqual(h);
+    expect((await cmd('decide',0,{planId:s.plans[0].id,planVersion:1,choice:'continue'},'personal')).status).toBe(409);
+  });  it('an export with ISO HRV and sub-minute workout timestamps persists through session validation',async()=>{
+    const {createExportParser}=await import('@/domain/health');const parser=createExportParser();
+    parser.push('<Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" unit="ms" value="50" startDate="2026-10-01 10:00:25 +0800" endDate="2026-10-01 10:00:25 +0800"/><Workout startDate="2026-10-01 10:00:20 +0800" endDate="2026-10-01 10:00:40 +0800"/>');
+    const s=blank();s.dataSource='apple-health';s.healthImport={...parser.finish(),via:'export-xml',importedAt:new Date().toISOString()};
+    const response=await session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state:s})}));expect(response.status).toBe(200);
+    expect((await repo.loadState(identity.sid))!.healthImport!.hrvSamples!['2026-10-01'][0].timestamp).toBe('2026-10-01T10:00:25+08:00');
+  });
+  it('rejects future review cutoffs and serializes one-time health tokens',async()=>{
+    const s=buildDemo(10);s.timezone='Asia/Taipei';await repo.saveState(`${identity.sid}-demo`,s);
+    const response=await reviews.POST(request('review',{planId:s.plans[0].id,planVersion:1,inputRevision:0,requestId:'future',today:'2099-01-01'},'demo'));expect(response.status).toBe(503);expect((await response.json()).error).toContain('future');
+    const token='concurrent-token';await repo.createLink({token,sid:identity.sid,status:'pending',expiresAt:Date.now()+60000});
+    expect((await Promise.all([repo.completeLink(token,s.healthImport!),repo.completeLink(token,s.healthImport!)])).sort()).toEqual([false,true]);
+  });
+
+});

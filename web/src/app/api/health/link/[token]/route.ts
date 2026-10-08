@@ -1,3 +1,4 @@
+import { modeSid } from '@/server/statePolicy';
 import { NextResponse } from 'next/server';
 import { sessionId } from '@/server/session';
 import { getLink, loadHealthImport } from '@/server/repo';
@@ -7,9 +8,9 @@ export const dynamic = 'force-dynamic';
 
 // The browser polls this while the iOS app is linking. Only the session that created
 // the token can see it.
-export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const sid = await sessionId();
+  const sid = modeSid(await sessionId(), req);
   const link = TOKEN.test(token) ? await getLink(token) : null;
   if (!link || link.sid !== sid) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const status = linkState(link);

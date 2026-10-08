@@ -8,7 +8,7 @@ import { acceptPlan, addObservation, blank, saveCheckin, saveEntry, type Feedbac
 export const SCENARIOS = [
   { day: 1, title: 'Day 1 · Just set up', desc: 'Apple Health connected. First check-in still to do; nothing to compare yet.' },
   { day: 4, title: 'Day 4 · Collecting', desc: 'Three evenings recorded and a step in progress. Discovery 3 of 4 days: tonight’s check-in unlocks the first findings.' },
-  { day: 10, title: 'Day 10 · Review day', desc: 'Over a week of check-ins, coffee and sleep. Findings with a step to try, and the step review is due today.' }
+  { day: 10, title: 'Day 10 · Review day', desc: 'Over a week of check-ins, coffee and sleep. Available comparisons and a saved step due for review today. New lifestyle interventions remain pending approval.' }
 ];
 
 // Small deterministic noise so scenarios look the same on every load.
@@ -21,10 +21,10 @@ export function buildDemo(day: number, now = new Date()): State {
   const start = addDays(today, -(day - 1));
   const iso = (n: number) => addDays(start, n); // n = 0 on day 1
 
-  st.onboarded = true;
+  st.onboarded = true; st.mode = 'demo';
   st.demo = { day, start };
   st.profile = { consent: { terms: true, health: true, share: false, at: now.toISOString() }, concerns: ['drained', 'caffeine', 'wake-tired'], goalId: 'evening-energy', attempts: ['Less or earlier caffeine'], attemptsNote: '', constraint: 'Overtime and changing plans', context: [] };
-  st.healthTypes = { sleep: true, activity: true, cycle: true };
+  st.healthTypes = { sleep: true, activity: true, cycle: true, hrv: true };
   st.healthImport = simulateAppleHealth(today);
   // Over the scenario's own days, use a varied week so both sides of each comparison fill.
   const SLEEP = [6.2, 7.4, 7.0, 6.3, 6.0, 6.5, 7.6, 7.3, 6.1, 6.8];
@@ -84,11 +84,23 @@ export function buildDemo(day: number, now = new Date()): State {
     if (rested) saveCheckin(st, { observationId: rested.id, topicId: rested.topicId, occurredAt: at('08:05', 150), status: 'recorded', score: 3 });
   }
   if (plan) {
-    st.messages.push(
-      { role: 'user', text: 'Help me explore my coffee habit' },
-      { role: 'guide', text: 'Let’s notice when your drinks happen, alongside your evening-energy check-in. Log each drink with its time. No need to change anything yet.', action: { type: 'caffeine' } },
-      { role: 'guide', text: 'Your step is saved and linked to evening energy. When you’ve tried it, tell me how it went. What you did and how you felt are kept separate.', action: { type: 'feedback', planId: plan.id } }
-    );
+    // Synthetic timelines contain records and plans, not fabricated Agent replies.
+
   }
+  st.caffeineCoverage = [];
+  for (let n = -1; n < day - 1; n++) {
+    const d = iso(n);
+    st.caffeineCoverage.push({ id: uid('cov'), from: `${d}T00:00`, to: `${addDays(d, 1)}T00:00`, confirmed: true,
+      status: st.entries.some(e => e.kind === 'caffeine' && e.date === d) ? 'yes' : 'no', origin: 'synthetic' });
+  }
+  // A confirmed yes window does not mean caffeine after 14:00; explicit late-window coverage.
+  for (let n = -1; n < day - 1; n++) {
+    const d = iso(n);
+    st.caffeineCoverage.push({ id: uid('cov'), from: `${d}T14:00`, to: `${addDays(d, 1)}T00:00`, confirmed: true,
+      status: st.entries.some(e => e.kind === 'caffeine' && e.date === d && e.occurredAt.slice(11) >= '14:00') ? 'yes' : 'no', origin: 'synthetic' });
+  }
+  st.checkins.forEach(r => r.origin = 'synthetic'); st.entries.forEach(r => r.origin = 'synthetic'); st.feedbacks.forEach(r => r.origin = 'synthetic');
+  st.profile.goals = st.observations.map((o, i) => ({ id: `goal:${o.topicId}`, label: o.topicId === 'evening-energy' ? 'Have energy after work' : 'Feel rested when I wake up', observationIds: [o.id], priority: i + 1 }));
+  for (const o of st.observations) o.goalIds = st.profile.goals.filter(g => g.observationIds.includes(o.id)).map(g => g.id);
   return st;
 }

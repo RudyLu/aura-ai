@@ -25,3 +25,265 @@
 @media (prefers-reduced-motion: reduce) { .typing-dots i { animation: typing-fade 1.6s infinite ease-in-out; } }
 @keyframes typing-fade { 50% { opacity: 1; } }
 .composer button[aria-busy="true"] { opacity: .45; }
+
+/* React adapters retain v2's supplied visual system and actual backend states. */
+@font-face { font-family: Syne; src: url('/assets/fonts/syne-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+.splashlogo img { display: block; margin: auto; max-width: 100%; }
+.splashvideo video { width: 100%; height: 100%; object-fit: cover; }
+.phone nav { z-index: 20; }
+.cb .speaker { display: block; font-size: 12px; margin-bottom: 6px; color: #e8c9b0; }
+.cb .via { color: #d4c9c0; font-weight: 400; }
+.cb .msgaction { display: block; margin-top: 10px; }
+.cb.urgent { border: 1px solid #ff8a7a; }
+.chatpage.v2 .chatbody { width: 100%; box-sizing: border-box; }
+.chatpage.v2 .convo .messages { padding: 0; }
+.chatpage.v2 .pillrow { overflow: auto; }
+.chatpage.v2 .pillrow button { flex-shrink: 0; }
+.chatpage.v2.hero .chatbody:empty { display: none; }
+.chatpage.v2 .footnote { display: block; text-align: center; color: #c8bcb6; padding: 8px 10px; font-size: 11px; }
+.airsummary { white-space: pre-wrap; }
+.aireview { padding: 20px 0; margin: 20px 0; border-top: 1px solid #ffffff25; }
+.aireview h3 { margin: 0 0 12px; }
+.aireview details { margin: 14px 0; }
+.aireview .pillbtn { margin: 12px 0; }
+.hrvblock { margin-top: 26px; padding-top: 20px; border-top: 1px solid #ffffff18; }
+.hrvplot .hline { stroke: #ffcf9e; }
+.hrvplot .hdot { fill: #ffcf9e; }
+.hrvplot .hbar { fill: #8fa3c7; fill-opacity: .3; }
+.hrvplot .ht { fill: #c0c5cf; }
+.hrvplot [role=button]:focus-visible { stroke: #ffcf9e; stroke-width: 1; outline: none; }
+.hrvtip { min-height: 40px; font-size: 13px; color: #d5d9e1; }
+.hrvinfo { font-size: 13px; margin: 10px 0 18px; }
+.hrvlegend { gap: 12px; }
+.goalcontext { margin-top: 16px; color: #d6c6bc; font-size: 14px; }
+.permission { gap: 12px; }
+.permission input { flex-shrink: 0; }
+.errorline { white-space: normal; }
+input, textarea { caret-color: #ffcf9e; }
+::selection { background: #eeb28b66; color: #fff; }
+:focus-visible { outline: 2px solid #ffcf9e; outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .splashvideo video { display: none; }
+  .splashvideo { background: url('/assets/video/onboarding-bg.jpg') center/cover; }
+  .typing-dots i { animation: none; opacity: .7; }
+  svg animate, svg animateTransform { display: none; }
+}
+
+.demotag.modebanner { position: relative; inset: auto; display: block; margin: 14px 24px 0 auto; z-index: 1; }
+
+.agentchoices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.agentchoices p { flex-basis: 100%; }
+.agentinsight { margin-top: 12px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.06); }
+.agentinsight small { display: block; opacity: .75; margin-top: 6px; }
+.chaterror { padding: 18px; border: 1px solid rgba(255,186,121,.35); border-radius: 20px; background: #222536; }
+.chaterror small { display: block; margin-bottom: 12px; }
+
+/* Feeling faces: translucent body, crisp expression and accent symbols. */
+.moodface > path:first-of-type { fill-opacity: .72; }
+
+/* A movable optical thumb above equal-height stationary ticks. */
+.rulerrail { --position: 0%; --lens-x: 18px; position: relative; height: 90px; margin: 18px 0 8px; touch-action: pan-y; cursor: grab; user-select: none; }
+.rulerrail:active { cursor: grabbing; }
+.railmarks { display: flex; justify-content: space-between; align-items: center; position: absolute; height: 60px; }
+.railmarks { inset: 15px 18px auto; }
+.railmarks i { flex: 0 0 2px; height: 24px; background: #ffffff35; border-radius: 2px; }
+.railcolour { position: absolute; inset: 0 18px; clip-path: inset(0 calc(100% - var(--position)) 0 0); pointer-events: none; }
+.railcolour .railmarks { left: 0; right: 0; }
+.railcolour i { background: #cfa98b; }
+.movinglens { position: absolute; left: calc(var(--lens-x) - 17px); top: 13px; width: 34px; height: 64px; border-radius: 22px; overflow: hidden; pointer-events: none; border: 1px solid #ffffff30; background: #ffffff07; backdrop-filter: blur(1.5px); -webkit-backdrop-filter: blur(1.5px); box-shadow: inset 1px 1px 2px #ffffff35, inset -2px -3px 8px #0008, 0 5px 14px #0003, 0 0 14px #edb38b12; }
+.movinglens::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(110deg, #ffffff20, transparent 28%, #ffffff03 62%, #0002); }
+ .rulerrail:focus-visible { outline: 2px solid #edb38b; outline-offset: 3px; border-radius: 16px; }
+.movinglens { border-color: #ffffff25; background: linear-gradient(105deg, #ffffff08, #15171a0a 45%, #ffffff05); backdrop-filter: blur(.65px); -webkit-backdrop-filter: blur(.65px); box-shadow: inset 1px 0 1px #ffffff35, inset -1px 0 2px #0009, inset 0 2px 4px #ffffff09, inset 0 -4px 6px #0005, 0 5px 12px #0003, 0 0 12px #edb38b0b; }
+.movinglens::before { content: ''; position: absolute; z-index: 2; left: 3px; top: 9px; bottom: 10px; width: 2px; border-radius: 50%; background: linear-gradient(180deg, transparent, #ffffff50 25%, #ffffff18 65%, transparent); filter: blur(.6px); }
+.movinglens::after { background: linear-gradient(110deg, #ffffff14, transparent 30%, #ffffff02 64%, #0002), linear-gradient(180deg, #ffffff16, transparent 15%, transparent 82%, #ffffff08); }
+
+/* Hide the original ticks behind the refracted copy to avoid double edges. */
+.movinglens { background: #202329e8; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+
+/* Refract the existing marks rather than placing another ruler inside the glass. */
+.railmarks i { transform-origin: center; }
+.movinglens { background: linear-gradient(var(--sheen-angle, 105deg), #ffffff0b, #ffffff01 36%, #ffffff03 65%, #00000012); backdrop-filter: blur(1.2px); -webkit-backdrop-filter: blur(1.2px); box-shadow: inset 1px 0 1px #ffffff40, inset -1px 0 2px #0007, inset 0 2px 4px #ffffff0a, inset 0 -3px 5px #0004, 0 5px 10px #0003; }
+.movinglens::before { width: 1px; left: 2px; background: linear-gradient(180deg, transparent, #ffffff65 26%, #ffffff25 62%, transparent); filter: blur(.4px); }
+.movinglens::after { background: linear-gradient(var(--sheen-angle, 105deg), #ffffff16, transparent 24%, transparent 72%, #ffffff07); }
+
+/* Aura lives within the moving glass, without obscuring its refracted marks. */
+.movinglens { background: radial-gradient(ellipse at 42% 48%, #edb38b24 0%, #edb38b12 32%, #c1b8d508 60%, transparent 82%), linear-gradient(var(--sheen-angle, 105deg), #ffffff0b, #ffffff01 36%, #ffffff03 65%, #00000012); box-shadow: inset 1px 0 1px #ffffff40, inset -1px 0 2px #0007, inset 0 2px 4px #ffffff0a, inset 0 -3px 5px #0004, 0 5px 10px #0003, 0 2px 16px #edb38b14; }
+.movinglens::after { background: radial-gradient(ellipse at 48% 55%, #f3c6a914, transparent 72%), linear-gradient(var(--sheen-angle, 105deg), #ffffff16, transparent 24%, transparent 72%, #ffffff07); }
+
+.aura-splash .splashmessage { font-size: 15px; color: #fff; }
+.aura-splash .splashdemolink { font-size: 14px; color: #fff; }
+
+/* Keep Aura’s background light present between entry moments. */
+.chatpage.scene.v2:not(.intro) .scenebg::after { opacity: .16; }
+@media (prefers-reduced-motion: no-preference) {
+  .chatpage.scene.v2:not(.intro) .scenebg::after { animation: auraAmbient 12s ease-in-out infinite alternate; }
+}
+@keyframes auraAmbient {
+  from { opacity: .12; transform: translateX(-50%) scale(1); }
+  to { opacity: .22; transform: translate(-48%, -12px) scale(1.06); }
+}
+
+/* Recorded scores echo Aura’s soft circular light. */
+.recrow .ric.recordglow { position: relative; isolation: isolate; overflow: visible; background: transparent; border-radius: 50%; }
+.recrow .recordglow::before { content: ''; position: absolute; z-index: -1; inset: -9px; border-radius: 50%; background: radial-gradient(circle, #efc9ab80 0%, #debda85c 24%, #c1b0ba28 48%, transparent 74%); filter: blur(3px); pointer-events: none; }
+.recrow .recordglow b { font: inherit; color: #fff; text-shadow: 0 1px 3px #0005; }
+
+.recrow .recordglow::before { inset: -2px; background: radial-gradient(circle, #efc9ab75 0%, #debda845 26%, #c1b0ba1a 46%, transparent 72%); filter: blur(2px); }
+.recrow .recordglow b { display: grid; place-items: center; width: 100%; height: 100%; line-height: 1; font-style: normal; }
+.photobuttons .filebutton { display: flex; align-items: center; justify-content: center; text-align: center; }
+
+/* Align SVG artwork without the inline text baseline offset. */
+.ric > span, .tlface > span { display: grid; place-items: center; width: 100%; height: 100%; line-height: 0; }
+.ric svg, .tlface svg, .kindbody > svg, .thumbs i svg { display: block; margin: auto; }
+.kindbody { width: 100%; place-items: center; }
+/* A single focused field edge replaces the offset double ring. */
+.inputlabel textarea:focus, .inputlabel textarea:focus-visible,
+.inputlabel input:focus, .inputlabel input:focus-visible,
+.inputlabel select:focus, .inputlabel select:focus-visible {
+  outline: none; border-color: #d4ad90; box-shadow: 0 0 0 1px #d4ad9020; }
+
+/* Keep the existing option pills; quiet only the page behind the open menu. */
+.chatpage.scene.v2.menuopen .scenebg { background: #0c0d10; }
+.chatpage.scene.v2.menuopen .scenebg::before,
+.chatpage.scene.v2.menuopen .scenebg::after,
+.chatpage.scene.v2.menuopen .scenebg .stars { opacity: 0; animation: none; }
+.chatpage.scene.v2.menuopen .chatdock { background: #0c0d10; }
+
+/* Before a conversation starts, leave only the suggested entries and composer. */
+.chatpage.scene.v2.hero .scenebg { background: #0c0d10; }
+.chatpage.scene.v2.hero .scenebg::before,
+.chatpage.scene.v2.hero .scenebg::after,
+.chatpage.scene.v2.hero .scenebg .stars { opacity: 0; animation: none; }
+.chatpage.scene.v2.hero .aurahero,
+.chatpage.scene.v2.hero .chatbody,
+.chatpage.scene.v2.hero .footnote { display: none; }
+.chatpage.scene.v2.hero .chatdock { margin-top: auto; background: #0c0d10; }
+.chatpage.scene.v2.menuopen .aurahero,
+.chatpage.scene.v2.menuopen .orbtop,
+.chatpage.scene.v2.menuopen .chatbody,
+.chatpage.scene.v2.menuopen .footnote { visibility: hidden; }
+
+.chatpage.scene.v2.menuopen .pillrow { display: none; }
+
+.chatpage.scene.v2.menuopen .scenebg,
+.chatpage.scene.v2.hero .scenebg { background: color-mix(in srgb, var(--bg) 50%, transparent); }
+.chatpage.scene.v2.menuopen .chatdock,
+.chatpage.scene.v2.hero .chatdock { background: transparent; }
+
+/* A frosted page layer lets Aura light show through the action menu. */
+.chatpage.scene.v2.menuopen .scenebg,
+.chatpage.scene.v2.hero .scenebg {
+  background: radial-gradient(ellipse at 32% 48%, #edb38b18, transparent 58%), radial-gradient(ellipse at 72% 28%, #9aa8ca12, transparent 60%), color-mix(in srgb, var(--bg) 38%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(115%);
+  backdrop-filter: blur(24px) saturate(115%);
+}
+.chatpage.scene.v2.menuopen .scenebg::before,
+.chatpage.scene.v2.hero .scenebg::before {
+  opacity: .3; background: linear-gradient(130deg, #ffffff08, transparent 42%, #ffffff03); height: 100%;
+}
+.chatpage.scene.v2.menuopen .scenebg::after,
+.chatpage.scene.v2.hero .scenebg::after { opacity: .1; animation: none; }
+
+/* Keep actual conversation content behind a foreground glass layer. */
+.chatpage.scene.v2.menuopen .chatbody,
+.chatpage.scene.v2.menuopen .orbtop,
+.chatpage.scene.v2.menuopen .aurahero { visibility: visible; }
+.chatpage.scene.v2.hero.menuopen .chatbody { display: block; }
+.chatpage.scene.v2.hero.menuopen .aurahero { display: block; }
+.chatpage.scene.v2.menuopen .scenebg { background: #101215; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.actionglass { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: color-mix(in srgb, var(--bg) 38%, transparent); backdrop-filter: blur(16px) saturate(110%); -webkit-backdrop-filter: blur(16px) saturate(110%); }
+.chatpage.scene.v2.menuopen .chatdock { position: relative; z-index: 4; }
+@media (min-width: 461px) { .actionglass { left: 50%; width: 430px; transform: translateX(-50%); } }
+
+/* Opening actions must not change the underlying page layout. */
+.chatpage.scene.v2.hero.menuopen .chatbody,
+.chatpage.scene.v2.hero.menuopen .aurahero { display: none; }
+.chatpage.scene.v2.menuopen .chatdock { position: sticky; bottom: 0; z-index: 4; }
+.chatpage.scene.v2 .chatdock { position: sticky; }
+.chatpage.scene.v2 .pillstack.attach { position: absolute; bottom: calc(100% - 8px); left: 22px; margin: 0; z-index: 5; }
+.actionglass { pointer-events: auto; }
+.chatpage.scene.v2.menuopen .pillrow { display: flex; visibility: hidden; pointer-events: none; }
+
+/* One coordinated entrance, without moving the sticky composer or nesting animations. */
+@media (prefers-reduced-motion: no-preference) {
+  .chatpage.scene.v2.entering .chatbody,
+  .chatpage.scene.v2.entering .aurahero,
+  .chatpage.scene.v2.entering .chatdock,
+  .chatpage.scene.v2.entering .auraclose { animation: auraEnterQuiet .34s cubic-bezier(.22, 1, .36, 1) both; }
+  .chatpage.scene.v2.entering .convo,
+  .chatpage.scene.v2.entering .pillopt,
+  .chatpage.scene.v2.entering .composerrow,
+  .chatpage.scene.v2.entering .footnote { animation: none; }
+  .chatpage.scene.v2.fromhero .orbtop .aura-top { animation: auraEnterQuiet .34s ease-out both; }
+  .chatpage.scene.v2.fromhero .convo { animation: none; }
+}
+@keyframes auraEnterQuiet { from { opacity: .35; } to { opacity: 1; } }
+
+/* Aura’s initial screen retains its light and hero; glass is only for the add menu. */
+.chatpage.scene.v2.hero:not(.menuopen) .aurahero { display: flex; visibility: visible; }
+.chatpage.scene.v2.hero:not(.menuopen) .chatbody { display: block; visibility: visible; }
+.chatpage.scene.v2.hero:not(.menuopen) .footnote { display: block; }
+.chatpage.scene.v2.hero:not(.menuopen) .scenebg { background: #101215; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.chatpage.scene.v2.hero:not(.menuopen) .scenebg::before { opacity: 1; }
+.chatpage.scene.v2.hero:not(.menuopen) .scenebg::after { opacity: .16; }
+.chatpage.scene.v2.hero:not(.menuopen) .scenebg .stars { opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+ .chatpage.scene.v2.hero:not(.menuopen) .scenebg::after { animation: auraAmbient 12s ease-in-out infinite alternate; }
+}
+.chatpage.scene.v2.hero.menuopen .aurahero { display: flex; visibility: visible; }
+.chatpage.scene.v2.hero.menuopen .chatbody { display: block; visibility: visible; }
+.chatpage.scene.v2.hero.menuopen .footnote { display: block; visibility: hidden; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .chatpage.scene.v2.fromhero .convo { animation: auraEnterQuiet .42s cubic-bezier(.22, 1, .36, 1) both; }
+  .chatpage.scene.v2.fromhero .cb.fresh { animation: none; }
+}
+
+/* Hero content and errors remain in normal flow instead of beneath a sticky dock. */
+.chatpage.scene.v2.hero .chatdock,
+.chatpage.scene.v2.hero.menuopen .chatdock { position: relative; bottom: auto; flex-shrink: 0; }
+.chatpage.scene.v2.hero .chatbody { flex: 0 0 auto; }
+.chatpage.scene.v2.hero .chaterror { margin: 18px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .chatpage.scene.v2.hero.entering .orbhero { animation: auraOrbArrive .85s cubic-bezier(.22, 1, .36, 1) both; }
+  .chatpage.scene.v2.hero .aura-core { animation: auraOrbBreathe 7s ease-in-out infinite; }
+  .chatpage.scene.v2.hero .aura-atmosphere { animation: auraLightBreathe 8s ease-in-out infinite; }
+}
+@keyframes auraOrbArrive { from { opacity: .2; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes auraOrbBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes auraLightBreathe { 0%, 100% { opacity: .65; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.08); } }
+
+/* Quiet, unified conversation error styling. */
+.chatpage.scene.v2 .chaterror { background: #202226; border: 1px solid #ffffff18; border-radius: 20px; color: #eceae7; box-shadow: none; }
+.chatpage.scene.v2 .chaterror p { color: #eceae7; }
+.chatpage.scene.v2 .chaterror small { color: #b9b8b6; }
+.chatpage.scene.v2 .chaterror .pillbtn { background: #ffffff0d; color: #eceae7; border: 1px solid #ffffff25; box-shadow: none; }
+.chatpage.scene.v2 .chaterror .pillbtn:hover { background: #ffffff16; }
+
+.aura-splash .splashmessage,
+.aura-splash .splashdemolink { font-weight: 300; }
+
+/* Keep recovery and the composer together when an initial request fails. */
+.chatpage.scene.v2.hero.haserror { height: 100dvh; min-height: 0; overflow-y: auto; }
+.chatpage.scene.v2.hero.haserror .aurahero { flex: 1 1 auto; min-height: 220px; padding-top: 56px; justify-content: center; }
+.chatpage.scene.v2.hero.haserror .orbhero { margin-bottom: 16px; }
+.chatpage.scene.v2.hero.haserror .orbhero .aura-hero { width: 112px; height: 112px; }
+.chatpage.scene.v2.hero.haserror .chatbody { margin-top: 0; }
+.chatpage.scene.v2.hero.haserror .chaterror { margin: 16px 0 8px; padding: 16px; }
+.chatpage.scene.v2.hero.haserror .chaterror p { margin: 0 0 6px; font-size: 14px; line-height: 1.45; }
+.chatpage.scene.v2.hero.haserror .chaterror small { margin-bottom: 10px; }
+.chatpage.scene.v2.hero.haserror .chatdock { margin-top: 0; padding-top: 8px; }
+.chatpage.scene.v2.hero.haserror .pillrow { display: none; }
+@media (max-height: 680px) {
+ .chatpage.scene.v2.hero.haserror .aurahero { padding-top: 48px; min-height: 180px; }
+ .chatpage.scene.v2.hero.haserror .orbhero .aura-hero { width: 80px; height: 80px; }
+ .chatpage.scene.v2.hero.haserror .aurahero h1 { font-size: 24px; }
+}
+/* The orb handover is measured from its actual hero position in Aura. */
+.chatpage.scene.v2.fromhero .orbtop .aura-top { animation: none; }
+
+/* Keep Today's current in its own visible background layer at every width. */
+main.today.todayA { isolation: isolate; }
+.todayA .daysweep { z-index: 1; left: 0; right: 0; width: auto; transform: none; }
+.todayA .todaysky { z-index: 0; }
+.todayA > :not(.daysweep):not(.todaysky) { position: relative; z-index: 2; }

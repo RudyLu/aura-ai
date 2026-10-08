@@ -1,3 +1,4 @@
+import { modeSid } from '@/server/statePolicy';
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,7 @@ const MAX = 8 * 1024 * 1024;
 // Upload a photo (or pick a bundled sample) and get Gemini's suggested fields.
 // Returns a draft only; the entry is saved by the client after the user confirms.
 export async function POST(req: Request) {
-  const sid = await sessionId();
+  const sid = modeSid(await sessionId(), req);
   const form = await req.formData();
   const sample = form.get('sample');
   let data: Buffer, type: string, photoUrl: string;
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     type = file.type;
     const id = uid('ph');
     await savePhoto(sid, id, data, type);
-    photoUrl = `/api/photo/${id}`;
+    photoUrl = `/api/photo/${id}?mode=${new URL(req.url).searchParams.get("mode") === "demo" ? "demo" : "personal"}`;
   }
 
   if (!geminiConfigured()) return NextResponse.json({ photoUrl, extraction: null, error: 'Photo recognition is off in this environment. Fill in the details yourself.' });

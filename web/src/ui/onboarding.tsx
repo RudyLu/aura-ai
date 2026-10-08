@@ -1,29 +1,32 @@
 'use client';
 // Splash and the setup flow (ported from app.js).
+import { TOPIC_ART } from './prototypeArt';
 import { useEffect, useRef } from 'react';
 import { CONCERN_GROUPS, CONCERNS, rankTopics, topic } from '@/domain/topics';
-import { factorsFor, MIN_DAYS } from '@/domain/discovery';
+import { factorsFor, MIN_DAYS } from '@/domain/uiDiscovery';
 import { healthSummary, sourceLabel } from '@/domain/health';
-import { AuraMark, Btn, ErrorLine, HEALTH_TILE, Option, Raw } from './core';
+import { AuraMark, Btn, CHECK, ErrorLine, goalArt, HEALTH_TILE, Option, Raw } from './core';
 import { dispatch, hasBridge, OB_LAST, OB_TITLES, runHealthImport } from './actions';
 import { render, S, ui, type OnboardingDraft } from './store';
+
+export const HEALTH_ICONS = {"sleep": "<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"#b49aff\"><path d=\"M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z\"/></svg>", "activity": "<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"#9fd67a\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"14\" cy=\"4.5\" r=\"2\" fill=\"#9fd67a\" stroke=\"none\"/><path d=\"M6 21l3.5-6 3 2.5V22M9.5 15l1.5-6.5 4 3 3.5.5M11 8.5L7 10l-1.5 3\"/></svg>", "cycle": "<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"#ff7aa2\"><path d=\"M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z\"/></svg>", "hrv": "<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"#ff6b6b\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12h4l2-5 4 10 2-5h6\"/></svg>"};
 
 const ATTEMPTS = ['An earlier bedtime', 'Less or earlier caffeine', 'More exercise', 'Short breaks or naps', 'Tracking with another app', 'Nothing yet'];
 const CONSTRAINTS = ['Keep it simple', 'Overtime and changing plans', 'Shift work', 'Family or caregiving'];
 
 export function Splash() {
   return (
-    <section className="splash aura-splash">
+    <section className="splash aura-splash hasvideo">
+      <div className="splashvideo" aria-hidden="true"><video poster="/assets/video/onboarding-bg.jpg" autoPlay muted loop playsInline preload="auto"><source src="/assets/video/onboarding-bg.mp4" type="video/mp4" /><source src="/assets/video/onboarding-bg.webm" type="video/webm" /></video></div>
       <div className="aura-opening">
-        <AuraMark size="aura-large" />
         <p className="splashlogo"><span className="logotype">Aura<span>.ai</span></span></p>
         <h1>Understand<br />how you live.</h1>
-        <p>Every life has a glow.<br />We help you see it.</p>
+        <p className="splashmessage">Every life has a glow.<br />We help you see it.</p>
       </div>
       <div className="splashbottom">
         <Btn act="begin">Get started</Btn>
-        <Btn act="demo" cls="text">See a demo timeline</Btn>
-        <small>Prototype. Your records are kept for this browser session only. {ui.ai.enabled ? 'Aura’s replies come from Gemini and are checked against your records.' : 'AI is off here, so Aura’s replies are preset.'}</small>
+        <Btn act="demo" cls="text splashdemolink">See a demo timeline</Btn>
+        <small>Prototype. Records are saved to your session. {ui.ai.enabled ? 'Replies by Gemini.' : 'Gemini is not connected.'}</small>
       </div>
     </section>
   );
@@ -40,7 +43,7 @@ const ObHead = ({ i }: { i: number }) => (
 function DiscoveryPreview({ data, types, topicId }: { data: string; types: OnboardingDraft['types']; topicId: string }) {
   const has = (need: string) => need === 'caffeine' ? true : (data !== 'none' && types[need as 'sleep']);
   return (
-    <section className="discoverypreview"><p className="eyebrow">After {MIN_DAYS} days of check-ins</p><p>Aura compares your days by:</p>
+    <section className="discoverypreview"><p className="eyebrow">{['stress', 'productivity'].includes(topicId) ? 'Your recorded context' : `After ${MIN_DAYS} days of check-ins`}</p><p>{['stress', 'productivity'].includes(topicId) ? 'Record feelings and context. Factor comparisons are not configured for this topic.' : 'Aura compares your days by:'}</p>
       <ul className="factorlist">{factorsFor(topicId).map(f => (
         <li key={f.id} className={has(f.needs) ? 'on' : 'off'}><span>{f.label}</span>{has(f.needs) ? null : <small>Needs {f.needs === 'sleep' ? 'sleep' : 'movement'} data</small>}</li>
       ))}</ul>
@@ -73,12 +76,14 @@ export function Onboarding() {
   if (i === 5) return <SyncScreen step on={o.data === 'apple-health' && !!st.healthImport} />;
   let body: React.ReactNode = null;
   if (i === 0) body = (
-    <><p>Pick any that fit. Aura will suggest where to start.</p>
-      <div className="concerns">{CONCERN_GROUPS.map(g => (
-        <fieldset className="concerngroup" key={g.id}><legend>{g.label}</legend>
-          <div className="chips">{g.items.map(c => <button key={c.id} type="button" className="chip" aria-pressed={o.concerns.includes(c.id)} onClick={e => dispatch('ob-concern', c.id, {}, e.currentTarget)}>{c.label}</button>)}</div>
-        </fieldset>
-      ))}</div></>
+    <><p className="obsub">Pick any that fit. Aura will suggest where to start.</p>
+      <div className="concerns cgrid">{CONCERN_GROUPS.map(g => {
+        const count = g.items.filter(c => o.concerns.includes(c.id)).length;
+        return <fieldset className={`cgroup ${count ? 'has' : ''}`} key={g.id}>
+          <legend><Raw cls="cicon" html={goalArt(g.id, 30)} />{g.label}{count ? <b>{count}</b> : null}</legend>
+          <div className="crows">{g.items.map(c => <button key={c.id} type="button" className="crow" aria-pressed={o.concerns.includes(c.id)} onClick={e => dispatch('ob-concern', c.id, {}, e.currentTarget)}><span>{c.label}</span><Raw tag="i" cls="ccheck" html={CHECK} /></button>)}</div>
+        </fieldset>;
+      })}</div></>
   );
   if (i === 2) {
     const t = topic(o.topicId);
@@ -150,7 +155,7 @@ function TopicDeck({ o }: { o: OnboardingDraft }) {
           const tag = k === 0 && r.score ? 'Best match' : r.score ? 'Also fits' : 'Another option';
           return (
             <article key={r.id} className="topiccard" data-topic={r.id} role="group" aria-roledescription="slide" aria-label={`${k + 1} of ${ranked.length}: ${tt.name}, ${tag}`}>
-              <div className={`topicart art-${r.id}`} aria-hidden="true"><span className="orb" /><span className="haze" /><span className={`matchtag ${k === 0 && r.score ? 'best' : ''}`}>{tag}</span></div>
+              <div className={`topicart lineart art-${r.id}`} aria-hidden="true"><Raw html={TOPIC_ART[r.id]} /><span className={`matchtag ${k === 0 && r.score ? 'best' : ''}`}>{tag}</span></div>
               <div className="topictext"><h1>{tt.name}</h1><p className="topicq">“{tt.question}”</p>
                 {r.why.length ? <p className="topicwhy">For {r.why.map((w, j) => <span key={w}>{j ? ' · ' : ''}<b>{w}</b></span>)}</p> : null}</div>
             </article>
@@ -169,23 +174,26 @@ function TopicDeck({ o }: { o: OnboardingDraft }) {
 export function SyncScreen({ on, step }: { on: boolean; step?: boolean }) {
   const st = S(), h = st.healthImport;
   const types = ui.ob ? ui.ob.types : st.healthTypes;
+  const rows = [
+    ['sleep', 'Sleep', 'Time asleep each night', '☾'],
+    ['activity', 'Exercise minutes', 'Daily total', '↗'],
+    ['cycle', 'Period dates', 'Dates only, no predictions', '♦'],
+    ['hrv', 'Heart rate variability', 'From Apple Watch', '〰']
+  ] as const;
+  const counts = h ? {
+    sleep: `${Object.keys(h.sleep || {}).length} nights`,
+    activity: `${Object.values(h.activity || {}).filter(v => v > 0).length} active days`,
+    cycle: `${(h.cycle || []).length} dates`,
+    hrv: `${Object.keys(h.hrvSamples || {}).length} days`
+  } : null;
   return (
-    <main className="syncscreen">{step ? <ObHead i={5} /> : null}
-      <div className="synchero"><h1>Sync with<br />Apple Health</h1><p>See sleep, movement and period dates next to your check-ins. Read only.</p></div>
-      <Raw cls="healthtile" tag="div" html={HEALTH_TILE} />
-      <div className="syncbottom">
-        <div className="synccard"><span className="synclabel">Apple Health<small>{on ? (h && h.via === 'simulated' ? 'Connected · simulated' : 'Connected') : 'Sleep, movement and period dates'}</small></span>
-          <button type="button" className="switch" role="switch" aria-checked={on} aria-label="Apple Health" onClick={e => dispatch('health-toggle', undefined, {}, e.currentTarget)}><i /></button></div>
-        {on ? (
-          <fieldset className="synctypes"><legend>Choose what to import</legend>
-            {([['sleep', 'Sleep', 'Time asleep each night'], ['activity', 'Exercise minutes', 'Daily total'], ['cycle', 'Period dates', 'Dates only; no predictions']] as const).map(([k, t, d]) => (
-              <label className="permission" key={k}><div><strong>{t}</strong><small>{d}</small></div>
-                <input type="checkbox" checked={types[k]} onChange={e => dispatch(ui.ob ? 'ob-type' : 'toggle-type', k, { checked: e.target.checked ? '1' : '' })} /></label>
-            ))}
-          </fieldset>
-        ) : null}
-        <Btn act="ob-next" cls="primary syncnext">{on ? 'Continue' : 'Continue without it'}</Btn>
-        <details className="realimport"><summary>Use your real Apple Health data instead</summary><HealthImportControls /></details>
+    <main className="syncscreen hkscreen">{step ? <ObHead i={5} /> : null}
+      <div className="hkbody">
+        <div className="hkpair" aria-hidden="true"><span className="hkapp aura"><span className="healthauraorb" /></span><span className={`hkmid ${on ? 'done' : ui.importing !== null ? 'spin' : ''}`}><Raw html={on ? CHECK : '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg>'} /></span><span className="hkapp"><Raw cls="healthtile" html={HEALTH_TILE} /></span></div>
+        <div className="hktext"><h1>{on ? 'All set. Aura is synced with Apple Health.' : 'Connect Apple Health to see the bigger picture'}</h1><p>{on ? `${h?.via === 'simulated' ? 'Demo data' : h?.via === 'export-xml' ? 'Imported from export.xml' : 'Linked from the Aura app'}. You can change this any time in Settings › Data.` : 'Aura reads these to compare with your check-ins. Read only.'}</p>
+          <ul className={`hklist ${on ? 'got' : ''}`}>{rows.filter(([k]) => !on || types[k] !== false).map(([k,t,d]) => <li key={k}><span className={`hkic healthicon-${k}`} aria-hidden="true"><Raw html={HEALTH_ICONS[k]} /></span><span>{t}{!on ? <small>{d}</small> : null}</span>{on && counts ? <b>{counts[k]}</b> : null}</li>)}</ul>
+        </div>
+        <div className="hkfoot">{on ? <Btn act="ob-next">Continue</Btn> : <><div className="hkbtns"><Btn act="ob-next" cls="secondary">Not now</Btn><Btn act="health-toggle">Connect</Btn></div><label className="filebutton hkalt">Have an export file? Import it instead<input type="file" accept=".xml,text/xml,application/xml" onChange={e => { const f=e.target.files?.[0]; if(f) runHealthImport(f); e.target.value=''; }} /></label></>}<ErrorLine id="health-error" />{ui.importing !== null ? <p role="status">Reading export… {Math.round(ui.importing*100)}%</p> : null}</div>
       </div>
     </main>
   );
@@ -202,7 +210,7 @@ export function HealthImportControls() {
         : <Btn act="health-link" cls="smallaction">{h && h.via === 'ios-app' ? 'Link again with the Aura iOS app' : 'Link with the Aura iOS app'}</Btn>}
       <label className="filebutton">{h && h.via !== 'simulated' ? 'Import a newer export.xml' : 'Choose export.xml'}
         <input type="file" accept=".xml,text/xml,application/xml" onChange={e => { const f = e.target.files?.[0]; if (f) runHealthImport(f); e.target.value = ''; }} /></label>
-      <details><summary>How to get export.xml</summary><p className="soft">On iPhone: Health › your profile picture › Export All Health Data. Unzip the file and choose <b>export.xml</b>. It is read in this browser; only daily totals (sleep hours, exercise minutes, period dates) are saved to your session.</p></details>
+      <details><summary>How to get export.xml</summary><p className="soft">On iPhone: Health › your profile picture › Export All Health Data. Unzip the file and choose <b>export.xml</b>. It is read in this browser; daily totals and selected timestamped HRV, workout and mindful-session records are saved to your session.</p></details>
       {status}<ErrorLine id="health-error" />
     </div>
   );

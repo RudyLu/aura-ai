@@ -1,3 +1,5 @@
+import { modeSid } from '@/server/statePolicy';
+import { geminiConfigured } from '@/server/gemini';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionId } from '@/server/session';
@@ -12,10 +14,13 @@ const Body = z.object({ text: z.string().trim().min(1).max(2000), today: z.strin
 
 // Aura reads this session's saved records (never another visitor's) and replies.
 export async function POST(req: Request) {
-  const sid = await sessionId();
+  const sid = modeSid(await sessionId(), req);
   const body = Body.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: 'Write a message first.' }, { status: 400 });
   const state = (await loadState(sid)) || blank();
+  // The original Agent remains unchanged. Its canned offline replies are not shown as live AI.
+  if (new URL(req.url).searchParams.get('mode') === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
+  if (!geminiConfigured()) return NextResponse.json({ status: 'not-integrated', error: 'Gemini is not connected. Your message is saved; no Agent response was generated.' }, { status: 503 });
   if (!allowAiCall(sid)) {
     return NextResponse.json({ reply: { text: 'I need a short rest before the next message. Your records are saved; try again in a little while.', action: null, draft: null, logOffer: null, via: 'verified-summary' } });
   }

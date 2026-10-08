@@ -2,7 +2,7 @@
 // Shared pieces ported from app.js: buttons that dispatch actions, the live Aura orb,
 // the 1–5 slider, and the SVG art (kept as markup strings and injected into their
 // parent element, so the CSS sees the same structure as the prototype).
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { topic } from '@/domain/topics';
 import type { Checkin } from '@/domain/state';
 import { dispatch, type ActData } from './actions';
@@ -24,7 +24,7 @@ export function Btn({ act, val, data, cls = 'primary', children, disabled, label
 }
 const armedLabel = (act: string) => ({
   'delete-record': 'Tap again to delete', 'pause-obs': 'Tap again to stop observing', 'clear-health': 'Tap again to remove',
-  reset: 'Tap again to delete everything', 'demo-load': 'Tap again: replaces your records'
+  reset: 'Tap again to delete everything', 'demo-load': 'Tap again: rebuilds demo records'
 }[act] || 'Tap again');
 
 export const Raw = ({ html, cls, tag = 'span', label }: { html: string; cls?: string; tag?: 'span' | 'div' | 'i'; label?: string }) => {
@@ -56,18 +56,77 @@ export const sentence = (topicId: string, v: number) => {
 export function ScaleSlider({ topicId, choice, ctx, obs }: { topicId: string; choice: string | null | undefined; ctx: 'checkin' | 'fb' | 'quick'; obs?: string }) {
   const t = topic(topicId);
   const set = /^[1-5]$/.test(String(choice ?? ''));
-  const v = set ? +choice! : 3;
+  const v = set ? +choice! : 1;
+  const rail = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const position = useRef((v - 1) / 4);
+  const selected = useRef(v);
+  const animation = useRef<number | null>(null);
+  const paint = (fraction: number) => {
+    position.current = fraction;
+    const el = rail.current;
+    if (!el) return;
+    const width = Math.max(1, el.clientWidth - 36);
+    el.style.setProperty('--position', `${fraction * 100}%`);
+    el.style.setProperty('--lens-x', `${18 + fraction * width}px`);
+    el.querySelectorAll<HTMLElement>('.railmarks i').forEach((mark, index) => {
+      const distance = (index % 33) / 32 * (width - 2) + 1 - fraction * width;
+      const strength = Math.exp(-Math.pow(distance / 13, 2));
+      mark.style.transform = `translateX(${distance * .18 * strength}px) scaleY(${1 + .5 * strength})`;
+    });
+  };
+  const settle = (target: number) => {
+    if (animation.current !== null) cancelAnimationFrame(animation.current);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { animation.current = null; paint(target); return; }
+    const from = position.current;
+    const start = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - start) / 260);
+      paint(from + (target - from) * (1 - Math.pow(1 - progress, 4)));
+      if (progress < 1) animation.current = requestAnimationFrame(step);
+      else animation.current = null;
+    };
+    animation.current = requestAnimationFrame(step);
+  };
+  const choose = (value: number) => {
+    selected.current = value;
+    dispatch('scale-range', String(value), { ctx, obs: obs || '' });
+  };
+  useEffect(() => {
+    if (!dragging.current && animation.current === null) { selected.current = v; paint((v - 1) / 4); }
+  }, [v, topicId, set]);
+  useEffect(() => {
+    const el = rail.current;
+    if (!el) return;
+    const resize = new ResizeObserver(() => paint(position.current));
+    resize.observe(el);
+    return () => { resize.disconnect(); if (animation.current !== null) cancelAnimationFrame(animation.current); };
+  }, []);
+  const point = (x: number) => {
+    const box = rail.current!.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (x - box.left - 18) / (box.width - 36)));
+    const movement = fraction - position.current;
+    rail.current?.style.setProperty('--sheen-angle', `${105 + Math.max(-12, Math.min(12, movement * 500))}deg`);
+    paint(fraction);
+    const score = Math.round(fraction * 4) + 1;
+    if (!set || score !== selected.current) choose(score);
+  };
+  const marks = Array.from({ length: 33 }, (_, i) => <i key={i} />);
   return (
-    <div className={`slider ${set ? 'set' : ''}`} data-topic={topicId}>
+    <div className={`slider ruler ${set ? 'set' : ''}`} data-topic={topicId}>
       <p className="sllead">{t.lead || t.name}</p>
       <p className="slvalue" aria-hidden="true">{set ? sentence(topicId, v) : 'Slide to answer'}</p>
-      <div className="sltrack" style={{ ['--t' as string]: (v - 1) / 4 }}>
-        <span className="slfill" aria-hidden="true" />
-        <input type="range" min={1} max={5} step={1} value={v} aria-label={t.question}
-          aria-valuetext={set ? `${v}, ${t.labels[v - 1]}` : 'Not answered'}
-          onChange={e => dispatch('scale-range', e.target.value, { ctx, obs: obs || '' }, e.currentTarget)}
-          onPointerDown={e => { if (!set) dispatch('scale-range', (e.currentTarget as HTMLInputElement).value, { ctx, obs: obs || '' }, e.currentTarget); }} />
+      <div ref={rail} className="rulerrail" role="slider" tabIndex={0} aria-label={t.question} aria-valuemin={1} aria-valuemax={5} aria-valuenow={v} aria-valuetext={set ? `${v}, ${t.labels[v - 1]}` : 'Not answered'}
+        onPointerDown={e => { if (animation.current !== null) { cancelAnimationFrame(animation.current); animation.current = null; } dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); point(e.clientX); }}
+        onPointerMove={e => { if (dragging.current) point(e.clientX); }}
+        onPointerUp={e => { if (dragging.current) { point(e.clientX); dragging.current = false; settle((selected.current - 1) / 4); } }}
+        onPointerCancel={() => { dragging.current = false; settle((selected.current - 1) / 4); }}
+        onKeyDown={e => { let n=v; if(e.key==='ArrowRight'||e.key==='ArrowUp')n=Math.min(5,v+1);else if(e.key==='ArrowLeft'||e.key==='ArrowDown')n=Math.max(1,v-1);else if(e.key==='Home')n=1;else if(e.key==='End')n=5;else return;e.preventDefault();choose(n);settle((n-1)/4); }}>
+        <span className="railmarks" aria-hidden="true">{marks}</span>
+        <span className="railcolour" aria-hidden="true"><span className="railmarks">{marks}</span></span>
+        <span className="movinglens" aria-hidden="true" />
       </div>
+
       <div className="slends" aria-hidden="true"><span>{t.labels[0]}</span><span>{t.labels[4]}</span></div>
     </div>
   );
@@ -87,6 +146,7 @@ export function ScalePreview({ topicId }: { topicId: string }) {
 export function checkinStatus(c: Checkin | null | undefined, topicId: string) {
   if (!c) return null;
   if (c.status === 'recorded') return `${c.score}/5 · ${topic(topicId).labels[(c.score || 1) - 1]}`;
+  if (c.status === 'text-only') return 'Words only';
   return c.status === 'unknown' ? 'Not sure' : 'Skipped';
 }
 export const SourceTag = ({ source }: { source?: string }) =>
@@ -133,8 +193,8 @@ export function goalArt(group: string, size = 80) {
 export const HEALTH_TILE = `<svg viewBox="0 0 48 48" width="56" height="56"><defs><linearGradient id="heartg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b8a"/><stop offset="1" stop-color="#ff2d55"/></linearGradient></defs><path d="M24 40.5S9 31.4 9 20.6A8.2 8.2 0 0 1 24 16a8.2 8.2 0 0 1 15 4.6C39 31.4 24 40.5 24 40.5z" fill="url(#heartg)"/></svg>`;
 
 export const LOG_ART: Record<'food' | 'caffeine', string> = {
-  food: `<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><defs><linearGradient id="lgfood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc59a"/><stop offset="1" stop-color="#e2607a"/></linearGradient></defs><path d="M22 14c-3 4 3 6 0 10M32 11c-3 4 3 6 0 10M42 14c-3 4 3 6 0 10" fill="none" stroke="#ffe6d0" stroke-width="2.4" stroke-linecap="round" opacity=".7"/><path d="M8 32h48a24 24 0 0 1-48 0z" fill="url(#lgfood)"/><ellipse cx="32" cy="32" rx="24" ry="4.5" fill="#fff1e2"/><ellipse cx="25" cy="31" rx="5" ry="2" fill="#7fcf8a"/><ellipse cx="38" cy="31.5" rx="6" ry="2.2" fill="#ffb07a"/></svg>`,
-  caffeine: `<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><defs><linearGradient id="lgcup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dcc0"/><stop offset="1" stop-color="#b9774f"/></linearGradient></defs><path d="M24 10c-3 4 3 6 0 10M34 8c-3 4 3 6 0 10" fill="none" stroke="#ffe6d0" stroke-width="2.4" stroke-linecap="round" opacity=".7"/><path d="M46 30h3a7 7 0 0 1 0 14h-4" fill="none" stroke="#e7b48c" stroke-width="4"/><path d="M14 24h34v14a15 15 0 0 1-15 15h-4a15 15 0 0 1-15-15z" fill="url(#lgcup)"/><ellipse cx="31" cy="24" rx="17" ry="3.5" fill="#6b3f2a"/><ellipse cx="31" cy="56" rx="22" ry="3.5" fill="#ffffff26"/></svg>`
+  food: `<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><defs><radialGradient id="lgfruit" cx=".3" cy=".2" r=".9"><stop offset="0" stop-color="#ffe9cf"/><stop offset=".45" stop-color="#f5b69e"/><stop offset="1" stop-color="#cc798d"/></radialGradient><filter id="lgfruitblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter></defs><ellipse cx="32" cy="36" rx="16" ry="18" fill="#edb38b" opacity=".2" filter="url(#lgfruitblur)"/><path d="M32 23c-7-7-20-3-20 10 0 12 10 23 20 23s20-11 20-23c0-13-13-17-20-10z" fill="url(#lgfruit)"/><path d="M32 21c0-8 7-13 14-13-1 8-7 13-14 13z" fill="#bdc9ad"/><path d="M32 23c-2-5-2-8 0-11" fill="none" stroke="#e4c6aa" stroke-width="2" stroke-linecap="round"/></svg>`,
+  caffeine: `<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><defs><radialGradient id="lgdrop" cx=".3" cy=".25" r=".95"><stop offset="0" stop-color="#fff3d5"/><stop offset=".42" stop-color="#e7bb84"/><stop offset="1" stop-color="#aa765e"/></radialGradient><filter id="lgdropblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter></defs><ellipse cx="32" cy="35" rx="15" ry="18" fill="#edbd87" opacity=".22" filter="url(#lgdropblur)"/><path d="M32 6c-3 12-17 22-17 33a17 17 0 0 0 34 0C49 28 35 18 32 6z" fill="url(#lgdrop)"/><path d="M32 22c-2 6-8 11-8 17a8 8 0 0 0 8 8" fill="none" stroke="#fff3dd" stroke-opacity=".4" stroke-width="2" stroke-linecap="round"/></svg>`
 };
 
 export const GEAR = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;

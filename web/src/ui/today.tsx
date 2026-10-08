@@ -2,7 +2,7 @@
 // Today (ported from views.js home()).
 import { useEffect, useRef } from 'react';
 import { addDays, dateRange, fmtDay } from '@/domain/dates';
-import { analyze, findings } from '@/domain/discovery';
+import { analyze, findings } from '@/domain/uiDiscovery';
 import { activeObservations, currentPlans, dayCheckin, observation, type Checkin, type Entry, type Observation, type Plan, type State } from '@/domain/state';
 import { CONCERNS, topic } from '@/domain/topics';
 import { AuraMark, Btn, checkinStatus, GEAR, goalArt, LOG_ART, plural, Raw, ScaleSlider } from './core';
@@ -247,40 +247,52 @@ function GoalHeader() {
   );
 }
 
-// The strongest finding across observations, with its step.
+// All executed comparisons remain available; no largest-gap action is promoted.
 function FindingCard() {
-  const s = S();
-  const taken = new Set(s.plans.map(p => p.fromFactor).filter(Boolean));
-  for (const o of activeObservations(s)) {
-    const r = analyze(s, o, today());
-    if (r.state !== 'ready') continue;
-    const top = findings(r).find(x => x.i.step && !taken.has(x.f.id) && (x.f.needs === 'caffeine' || (s.dataSource !== 'none' && s.healthTypes[x.f.needs])));
-    if (!top) continue;
-    return (
-      <section className="todayfinding" aria-labelledby="h-find"><p className="eyebrow">From your records</p><h2 id="h-find">{top.i.headline}</h2>
-        <div className="findrow"><span><small>Something to try</small>{top.i.step!.title}</span><Btn act="disc-try" val={top.f.id} data={{ obs: o.id }} cls="smallaction">Try it</Btn></div>
-      </section>
-    );
-  }
-  return null;
+  const available = activeObservations(S()).filter(o => analyze(S(),o,today()).state === 'ready');
+  if (!available.length) return null;
+  return <section className="todayfinding" aria-labelledby="h-find"><p className="eyebrow">From your records</p><h2 id="h-find">Explore your comparisons</h2><p>See all available comparisons, counts and limits. These records don’t establish causes.</p>{available.map(o=><Btn key={o.id} act="goexplore" data={{obs:o.id}} cls="quiet">{topic(o.topicId).name}</Btn>)}</section>;
 }
 
+export const TOPIC_HUES: Record<string, string> = { 'evening-energy': '#ffba79', 'rested-waking': '#e6cf8f', 'afternoon-sleepiness': '#c3a6d9', stress: '#9fb4e0', productivity: '#9ccfb8' };
 export function Today() {
-  const s = S();
-  const obs = activeObservations(s);
-  const plans = currentPlans(s);
-  const n = nextUp(s);
-  const focusObs = n.kind === 'checkin' || n.kind === 'later' ? n.obs.id : null, focusPlan = n.kind === 'plan' ? n.plan.id : null;
-  // Answered check-ins move to Today's log; this list is only what's still to do.
-  const rows = [...obs.filter(o => o.id !== focusObs && !dayCheckin(s, o.id, today())).map(o => <ObsRow key={o.id} o={o} />), ...plans.filter(p => p.id !== focusPlan).map(p => <PlanRow key={p.id} p={p} />)];
-  return (
-    <main className="today">
-      {s.demo ? <button type="button" className="demochip" onClick={e => dispatch('open', 'demo', {}, e.currentTarget)}>Demo timeline · Day {s.demo.day} <span>Change</span></button> : null}
-      <GoalHeader />
-      <NextCard n={n} />
-      <LogSection />
-      {rows.length ? <section aria-labelledby="h-today"><h2 className="listhead" id="h-today">Still to do</h2><ul className="rows">{rows}</ul></section> : null}
-      <FindingCard />
-    </main>
-  );
+  const s = S(), obs = activeObservations(s), plans = currentPlans(s);
+  const p = plans.find(p => p.status === 'active') || plans[0];
+  const pending = obs.filter(o => !dayCheckin(s, o.id, today()));
+  const focus = pending.sort((a,b) => a.time.localeCompare(b.time))[0];
+  const left = pending.length + (p?.status === 'active' && today() < p.review && !s.feedbacks.some(f => f.planId === p.id && f.date === today()) ? 1 : 0);
+  const total = obs.length + (p?.status === 'active' ? 1 : 0);
+  const progress = total ? (total-left)/total : 1;
+  const days = p ? dateRange(p.start, p.review) : [], dayN = Math.min(days.length, Math.max(1, days.indexOf(today())+1));
+  const recs = dayRecords(s, today());
+  const light = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sweep=light.current, heading=sweep?.parentElement?.querySelector('.todayhead');
+    if (!sweep || ui.todaySweepDone || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    sweep.classList.add('play'); heading?.classList.add('energized');
+    const titleTimer=setTimeout(()=>heading?.classList.remove('energized'),2600);
+    const settleTimer=setTimeout(()=>{sweep.classList.remove('play');ui.todaySweepDone=true;},3200);
+    return ()=>{clearTimeout(titleTimer);clearTimeout(settleTimer);sweep.classList.remove('play');heading?.classList.remove('energized');};
+  }, []);
+  return <main className="today todayA">
+    <div ref={light} className="daysweep" style={{ ['--p' as string]: Math.max(.25,progress) }} aria-hidden="true"><span className="dswash" /><span className="dscore" /><span className="dsstreak" /></div><div className="todaysky" aria-hidden="true"><span className="stars" /></div>
+    {s.demo ? <button type="button" className="demochip" onClick={e => dispatch('open','demo',{},e.currentTarget)}>Demo timeline · Day {s.demo.day} <span>Change</span></button> : null}
+    <div className="pagehead todayhead"><div className="todaytop"><p className="eyebrow">Today · {new Date().toLocaleDateString('en',{weekday:'short',day:'2-digit'})}</p><button className="gear" aria-label="Settings" onClick={e => dispatch('open','settings',{},e.currentTarget)} dangerouslySetInnerHTML={{__html:GEAR}} /></div>
+      <h1>{left ? `${['No','One','Two','Three','Four','Five','Six'][left] || left} ${left === 1 ? 'thing' : 'things'} left` : 'All done for today'}{left && obs[0] ? <> for your <em style={{color:TOPIC_HUES[obs[0].topicId]}}>{topic(obs[0].topicId).construct.toLowerCase()}</em></> : null}</h1>
+      {s.profile.goals?.length ? <details className="goalcontext"><summary>Your goals ({s.profile.goals.length})</summary><ul>{s.profile.goals.map(g => <li key={g.id}>{g.label}{g.priority === 1 ? ' · priority' : ''}</li>)}</ul></details> : null}
+    </div>
+    <section className="chartcard tcard" aria-labelledby="h-check"><div className="chartcardhead"><h2 id="h-check">Check in</h2><small>{focus ? `${focus.time} · ${topic(focus.topicId).name}` : 'All done'}</small></div>
+      {focus ? <><p className="checkq">{topic(focus.topicId).question}</p><QuickScale o={focus} /></> : <p className="soft checkdone">Everything checked in today.</p>}
+      {pending.length > 1 ? <ul className="rows">{pending.filter(o => o !== focus).map(o => <ObsRow key={o.id} o={o}/>)}</ul> : null}
+      <ul className="donelist">{obs.filter(o => !!dayCheckin(s,o.id,today())).map(o => { const c = dayCheckin(s,o.id,today())!; return <li key={o.id}><i className="hue" style={{background:TOPIC_HUES[o.topicId]}}/><span>{topic(o.topicId).name}</span><b>{c.status === 'recorded' ? `${c.score}/5` : c.status}</b><Btn act="open" val="checkin" data={{obs:o.id,rec:c.id}} cls="quiet">Edit</Btn></li>; })}</ul>
+    </section>
+    {p ? <section className="chartcard tcard" aria-labelledby="h-step"><div className="chartcardhead"><h2 id="h-step">Your step</h2><small>{today() >= p.review ? 'Review day' : `Day ${dayN} of ${days.length}`}</small></div><div className="stepbar tbar"><i style={{width:`${dayN/Math.max(days.length,1)*100}%`}} /></div><p className="tstep">{p.title}</p><div className="tactions"><Btn act={today() >= p.review ? 'open' : 'feedback'} val="review" data={{plan:p.id}} cls="pillbtn">{today() >= p.review ? 'Review your step' : 'How did it go?'}</Btn><Btn act="open" val="history" cls="pillbtn ghost">History</Btn></div></section> : null}
+    <section className="chartcard tcard" aria-labelledby="h-recs"><div className="chartcardhead"><h2 id="h-recs">Today’s records</h2><small>{recs.length ? `${recs.length} so far` : 'Nothing yet'}</small></div>
+      <ul className="reclist">{recs.map(x => { const r = x.r, chk = x.kind === 'checkin' ? r as Checkin : null, e = r as Entry; return <li key={r.id}><button className="recrow" onClick={ev => dispatch('open',chk ? 'checkin' : e.kind,{rec:r.id,obs:chk?.observationId},ev.currentTarget)}><time>{timeOf(r.occurredAt)}</time><span className={`ric ${chk?.status === 'recorded' ? 'recordglow' : ''}`}>{chk ? <b>{chk.score || '–'}</b> : e.photoUrl ? <img src={e.photoUrl} alt=""/> : <Raw html={LOG_ART[e.kind]}/>}</span><span className="recname"><span className="rn">{chk ? topic(chk.topicId).name : e.name}</span><OriginTag origin={r.origin}/></span><small>{chk ? checkinStatus(chk,chk.topicId) : e.kind === 'food' ? 'Food' : 'Caffeine'}</small></button></li>; })}</ul>
+      {!recs.length ? <p className="soft recempty">Add a meal or a drink when it happens.</p> : null}
+      <div className="tactions"><Btn act="open" val="food" cls="pillbtn ghost">＋ Food</Btn><Btn act="open" val="caffeine" cls="pillbtn ghost">＋ Drink</Btn><Btn act="tab" val="aura" cls="pillbtn ghost">Talk to Aura</Btn></div>
+    </section>
+    <FindingCard />
+  </main>;
 }
+export function OriginTag({ origin }: { origin?: string }) { return origin === 'synthetic' ? <span className="badge synth">Synthetic</span> : origin === 'demo-live' ? <span className="badge live">Added during demo</span> : null; }

@@ -14,6 +14,8 @@ import { activeObservations, type HealthImport, type Observation, type State, ty
 
 const SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis';
 const EXERCISE = 'HKQuantityTypeIdentifierAppleExerciseTime';
+const HRV = 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN';
+const MINDFUL = 'HKCategoryTypeIdentifierMindfulSession';
 const FLOW = 'HKCategoryTypeIdentifierMenstrualFlow';
 const ASLEEP = /HKCategoryValueSleepAnalysisAsleep/; // Asleep, AsleepCore/Deep/REM/Unspecified; excludes InBed & Awake
 
@@ -36,20 +38,21 @@ export const SAMPLE_CAFFEINE_DAYS = [1, 3, 4, 6, 8, 9, 11, 13];
 
 export function seedSample(s: State, obs: Observation, today: string) {
   const scores = SAMPLE_SCORES[obs.topicId];
+  if (!scores) return;
   const t = topic(obs.topicId).timing.defaultTime;
   for (let n = 1; n <= 13; n++) {
     const date = addDays(today, -n);
     if (s.checkins.some(c => c.source === 'sample' && c.observationId === obs.id && c.date === date)) continue;
     const score = scores[n];
     s.checkins.push({
-      id: uid('smp'), observationId: obs.id, topicId: obs.topicId, source: 'sample',
+      id: uid('smp'), origin:'synthetic', observationId: obs.id, topicId: obs.topicId, source: 'sample',
       occurredAt: `${date}T${t}`, date, status: score === null ? 'unknown' : 'recorded', score, note: '', createdAt: new Date().toISOString()
     });
   }
   for (const n of SAMPLE_CAFFEINE_DAYS) {
     const date = addDays(today, -n);
     if (s.entries.some(e => e.source === 'sample' && e.date === date)) continue;
-    s.entries.push({ id: uid('smp'), source: 'sample', kind: 'caffeine', name: 'Coffee', size: '1 cup', mg: null, occurredAt: `${date}T${n % 3 ? '10:30' : '15:00'}`, date, note: '', createdAt: new Date().toISOString() });
+    s.entries.push({ id: uid('smp'), origin:'synthetic', source: 'sample', kind: 'caffeine', name: 'Coffee', size: '1 cup', mg: null, occurredAt: `${date}T${n % 3 ? '10:30' : '15:00'}`, date, note: '', createdAt: new Date().toISOString() });
   }
 }
 export function setDataSource(s: State, src: DataSource, today: string) {
@@ -79,16 +82,40 @@ export function createExportParser() {
   const sleepIntervals: Record<string, [number, number][]> = {}; // wake date → [[start,end],...]
   const activity: Record<string, number> = {};
   const cycle = new Set<string>();
+  const hrvSamples: NonNullable<HealthImport['hrvSamples']> = {}, workouts: NonNullable<HealthImport['workouts']> = {}, mindful: NonNullable<HealthImport['mindful']> = {};
+  const offsets = new Set<string>();
   let minDate: string | null = null, maxDate: string | null = null;
   const seen = (d: string) => { if (!minDate || d < minDate) minDate = d; if (!maxDate || d > maxDate) maxDate = d; };
 
   function handle(tag: string) {
     const type = attr(tag, 'type');
-    if (type !== SLEEP && type !== EXERCISE && type !== FLOW) return;
+    if (type !== SLEEP && type !== EXERCISE && type !== FLOW && type !== HRV && type !== MINDFUL && !tag.startsWith('<Workout ')) return;
     const start = parseHKDate(attr(tag, 'startDate'));
     const end = parseHKDate(attr(tag, 'endDate'));
     if (!start || !end) return;
     count++;
+    const startRaw = attr(tag, 'startDate') || '';
+    const offset = startRaw.match(/([+-]\d{4})$/)?.[1]; if (offset) offsets.add(offset);
+    const instant = (raw:string) => raw.replace(' ','T').replace(/ ([+-])(\d{2})(\d{2})$/, '$1$2:$3');
+    const time = (raw: string | null) => raw?.slice(11, 16) || '00:00';
+    if (type === HRV) {
+      const value = Number(attr(tag, 'value')); const unit = attr(tag, 'unit');
+      const ms = unit === 's' ? value * 1000 : unit === 'ms' ? value : NaN;
+      if (Number.isFinite(ms) && ms > 0) (hrvSamples[start.date] ||= []).push({ t: time(startRaw), ms, timestamp: instant(startRaw) });
+      seen(start.date); return;
+    }
+    if (type === MINDFUL || tag.startsWith('<Workout ')) {
+      const out = type === MINDFUL ? mindful : workouts;
+      // Keep original instants and split every calendar date crossed by the interval.
+      const endRaw = attr(tag,'endDate') || '';
+      if (Date.parse(instant(endRaw)) <= Date.parse(instant(startRaw))) return;
+      for (let date = start.date; date <= end.date; date = addDays(date,1)) {
+        const a = date === start.date ? time(startRaw) : '00:00', b = date === end.date ? time(endRaw) : '24:00';
+        if (a === b && date !== start.date) continue;
+        (out[date] ||= []).push({start:a,end:b,startAt:instant(startRaw),endAt:instant(endRaw)});
+      }
+      seen(start.date); return;
+    }
     if (type === SLEEP) {
       if (!ASLEEP.test(attr(tag, 'value') || '')) return;
       (sleepIntervals[end.date] = sleepIntervals[end.date] || []).push([start.ms, end.ms]);
@@ -109,7 +136,7 @@ export function createExportParser() {
   return {
     push(chunk: string) {
       const text = tail + chunk;
-      const re = /<Record\b[^>]*>/g;
+      const re = /<(?:Record|Workout)\b[^>]*>/g;
       let m: RegExpExecArray | null, last = 0;
       while ((m = re.exec(text))) { handle(m[0]); last = re.lastIndex; }
       // Keep a possibly incomplete tag for the next chunk.
@@ -132,7 +159,7 @@ export function createExportParser() {
       }
       for (const d of Object.keys(activity)) activity[d] = Math.round(activity[d]);
       const range: [string, string] | null = minDate && maxDate ? [minDate, maxDate] : null;
-      return { sleep, activity, cycle: [...cycle].sort(), records: count, range };
+      return { sleep, activity, cycle: [...cycle].sort(), hrvSamples, workouts, mindful, timezone: offsets.size === 1 ? [...offsets][0] : 'mixed-offsets', records: count, range };
     }
   };
 }
@@ -152,14 +179,14 @@ export async function importExportFile(file: File, onProgress?: (p: number) => v
   }
   parser.push(decoder.decode());
   const out = parser.finish();
-  if (!out.records) throw new Error('No sleep, exercise or cycle records were found in this file.');
+  if (!out.records) throw new Error('No supported Apple Health records were found in this file.');
   return Object.assign(out, { via: 'export-xml' as const, fileName: file.name, importedAt: new Date().toISOString() });
 }
 
 interface Bridge {
   isAvailable(): boolean;
   requestAuthorization(types: string[]): Promise<string[]>;
-  fetchDaily(q: { types: string[]; from: string; to: string }): Promise<{ sleep?: Record<string, number>; activity?: Record<string, number>; cycle?: string[] }>;
+  fetchDaily(q: { types: string[]; from: string; to: string }): Promise<{ sleep?: Record<string, number>; activity?: Record<string, number>; cycle?: string[]; hrvSamples?: HealthImport['hrvSamples']; workouts?: HealthImport['workouts']; mindful?: HealthImport['mindful']; timezone?: string }>;
 }
 export const bridge = (): Bridge | null => {
   const b = typeof window !== 'undefined' ? (window as unknown as { AuraHealthBridge?: Bridge }).AuraHealthBridge : undefined;
@@ -170,7 +197,7 @@ export async function importFromBridge(types: string[], from: string, to: string
   if (!b) throw new Error('Apple Health bridge not available in this browser.');
   const granted = await b.requestAuthorization(types);
   const data = await b.fetchDaily({ types: granted, from, to });
-  return { sleep: data.sleep || {}, activity: data.activity || {}, cycle: data.cycle || [], range: [from, to], via: 'bridge', granted, importedAt: new Date().toISOString(), records: null };
+  return { sleep: data.sleep || {}, activity: data.activity || {}, cycle: data.cycle || [], hrvSamples: data.hrvSamples, workouts: data.workouts || {}, mindful: data.mindful || {}, timezone: data.timezone, range: [from, to], via: 'bridge', granted, importedAt: new Date().toISOString(), records: null };
 }
 
 // ---------- one accessor for every screen ----------
@@ -212,7 +239,13 @@ export function simulateAppleHealth(today: string): HealthImport {
     activity[d] = [1, 3, 5].includes(wd) ? 25 + (n % 3) * 10 : (wd === 6 ? 50 : 0);
   }
   for (const n of [2, 3, 4, 5]) cycle.push(add(today, -n));
-  return { sleep, activity, cycle: cycle.sort(), range: [add(today, -29), today], via: 'simulated', importedAt: new Date().toISOString(), records: null };
+  const hrvSamples: NonNullable<HealthImport['hrvSamples']> = {}, workouts: NonNullable<HealthImport['workouts']> = {}, mindful: NonNullable<HealthImport['mindful']> = {};
+  for (let n = 0; n < 40; n++) {
+    const d = add(today, -n);
+    hrvSamples[d] = ['08:40', '10:30', '12:20', '16:10', '18:30', '20:15'].map((t, i) => ({ t, ms: [58, 46, 30, 132, 41, 64][i] + (n % 5) * 2 }));
+    workouts[d] = [{ start: '18:00', end: '19:00' }]; mindful[d] = [{ start: '16:00', end: '16:15' }];
+  }
+  return { sleep, activity, cycle: cycle.sort(), hrvSamples, workouts, mindful, timezone: 'simulated-local', range: [add(today, -29), today], via: 'simulated', importedAt: new Date().toISOString(), records: null };
 }
 
 export function healthSummary(h: HealthImport) {
