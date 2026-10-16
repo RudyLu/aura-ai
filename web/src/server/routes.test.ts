@@ -130,3 +130,14 @@ describe('real file-backed routes and visitor/mode isolation',()=>{
     expect((await repo.loadState(identity.sid))!.healthImport!.via).toBe('export-xml');
   });
 });
+describe('chat request validation',()=>{
+  const chat=async(body:unknown)=>(await import('@/app/api/aura/route')).POST(request('aura',body));
+  it('rejects stale revisions and options Aura did not offer in its latest message',async()=>{
+    const s=blank();s.inputRevision=3;s.messages=[{role:'guide',text:'Which one?',interaction:{kind:'clarification',options:[{id:'stress',label:'Perceived stress',text:'I mean stress',topicId:'stress'}]}},{role:'user',text:'I mean stress'}];await repo.saveState(identity.sid,s);
+    expect((await chat({text:'hi',today:'2026-10-08',inputRevision:2})).status).toBe(409);
+    expect((await chat({text:'I mean stress',today:'2026-10-08',inputRevision:3,choice:{messageIndex:0,optionId:'productivity',topicId:'productivity'}})).status).toBe(400);
+    expect((await chat({text:'I mean stress',today:'2026-10-08',inputRevision:3,choice:{messageIndex:0,optionId:'stress',topicId:'productivity'}})).status).toBe(400);
+    expect((await chat({text:'I mean stress',today:'2026-10-08',choice:{messageIndex:0,optionId:'stress',topicId:'stress'}})).status).toBe(503);
+    expect((await chat({text:'x',today:'2026-10-08',selectedTopic:'made-up'})).status).toBe(400);
+  });
+});

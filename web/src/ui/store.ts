@@ -21,7 +21,7 @@ export interface ModalData {
 }
 export interface UI {
   todaySweepDone: boolean; auraIntroDone: boolean; freshMsg: number;
-  chatError: string | null; failedMessage: string | null; nextUp: number | null;
+  chatError: string | null; failedMessage: string | null; failedChoice: { messageIndex: number; optionId: string; topicId?: TopicId } | null; nextUp: number | null;
   mode: 'personal' | 'demo'; previousTab: 'today' | 'explore'; saving: boolean; reviewStatus: 'idle' | 'loading' | 'error' | 'not-integrated'; reviewError: string | null; reviewResult: AIReview | null;
   ready: boolean; page: 'splash' | 'onboarding' | 'app'; tab: 'today' | 'explore' | 'aura';
   modal: string | null; m: ModalData; modalSeq: number; step: number; ob: OnboardingDraft | null; fromReview: boolean;
@@ -36,7 +36,7 @@ export interface UI {
 
 export const ui: UI = {
   todaySweepDone: false, auraIntroDone: false, freshMsg: 0,
-  chatError: null, failedMessage: null, nextUp: null,
+  chatError: null, failedMessage: null, failedChoice: null, nextUp: null,
   mode: 'personal', previousTab: 'today', saving: false, reviewStatus: 'idle', reviewError: null, reviewResult: null,
   ready: false, page: 'splash', tab: 'today', modal: null, m: {}, modalSeq: 0, step: 0, ob: null, fromReview: false,
   draft: null, auraState: 'idle', pending: false, logOffer: null,
@@ -139,7 +139,7 @@ export async function switchMode(mode: 'personal' | 'demo') {
   ui.mode = mode; try {localStorage.setItem('aura-mode', mode);}catch {/* Mode isolation does not depend on browser storage. */}
   st = Object.assign(blank(), data.state); st.mode = mode;
   ui.page = st.onboarded ? 'app' : 'splash'; ui.tab = 'today'; ui.modal = null; ui.draft = null; ui.logOffer = null; ui.reviewResult = null;
-  ui.chatError = null; ui.failedMessage = null; ui.nextUp = null; restoreConversation(); render();
+  ui.chatError = null; ui.failedMessage = null; ui.failedChoice = null; ui.nextUp = null; restoreConversation(); render();
 }
 export async function command(action: string, data: Record<string, unknown>) {
   await flush();

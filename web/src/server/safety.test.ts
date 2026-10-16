@@ -56,22 +56,30 @@ describe('emergency input never reaches the model', () => {
 
 describe('grounding check (PRD §3.2)', () => {
   const s = buildDemo(10, new Date(2026, 9, 5, 12, 0));
-  const { facts, allowedFindingSteps } = buildFacts(s, '2026-10-05');
-  const base = { cited: ['cmp:evening-energy:short-sleep'], stepId: '', action: 'none', actionTopic: '', offerLogName: '', offerLogNote: '' };
+  const { facts } = buildFacts(s, '2026-10-05');
+  const cmp = facts.find(f => f.id === 'cmp:evening-energy:short-sleep')!;
+  const base = { cited: [cmp.id], topicId: 'evening-energy', clarify: false, clarifyTopics: [], stepId: '', action: 'none', offerLogName: '', offerLogNote: '' };
 
   it('accepts numbers that appear in cited facts', () => {
-    const out = { ...base, reply: 'On 4 days after under 7 hours of sleep your energy averaged 2.5, versus 3.7 on 3 days with more.' };
-    expect(grounding(out, facts, 'how was my week', allowedFindingSteps, true)).toEqual([]);
+    const out = { ...base, reply: `That comparison covers ${cmp.numbers.slice(0, 2).join(' and ')}.` };
+    expect(grounding(out, facts, 'how was my week', true)).toEqual([]);
   });
   it('rejects invented numbers and unknown citations', () => {
-    const out = { ...base, cited: ['cmp:evening-energy:short-sleep', 'made-up'], reply: 'Your energy was 40% higher after good sleep.' };
-    const p = grounding(out, facts, 'how was my week', allowedFindingSteps, true);
+    const out = { ...base, cited: [cmp.id, 'made-up'], reply: 'Your energy was 40% higher after good sleep.' };
+    const p = grounding(out, facts, 'how was my week', true);
     expect(p.join(' ')).toMatch(/made-up/);
     expect(p.join(' ')).toMatch(/40/);
   });
-  it('rejects a finding step whose finding does not exist, and any step when steps are disabled', () => {
-    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'finding:movement-same:0' }, facts, 'x', allowedFindingSteps, true).join(' ')).toMatch(/needs a finding/);
-    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'finding:short-sleep:1' }, facts, 'x', allowedFindingSteps, true)).toEqual([]);
-    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'chat:busy-week' }, facts, 'x', allowedFindingSteps, false).join(' ')).toMatch(/No step/);
+  it('rejects unapproved finding steps, and any step when steps are disabled', () => {
+    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'finding:short-sleep:1' }, facts, 'x', true).join(' ')).toMatch(/not on the menu/);
+    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'chat:busy-week' }, facts, 'x', true)).toEqual([]);
+    expect(grounding({ ...base, reply: 'Maybe try this.', stepId: 'chat:busy-week' }, facts, 'x', false).join(' ')).toMatch(/No step/);
+  });
+  it('never routes an afternoon request to an evening-energy step or another topic\'s comparison', () => {
+    const afternoon = { ...base, cited: [], topicId: 'afternoon-sleepiness', reply: 'Maybe try this.' };
+    expect(grounding({ ...afternoon, stepId: 'chat:checkin-tonight' }, facts, 'x', true).join(' ')).toMatch(/another topic/);
+    expect(grounding({ ...afternoon, stepId: 'chat:busy-week' }, facts, 'x', true)).toEqual([]);
+    expect(grounding({ ...afternoon, cited: [cmp.id] }, facts, 'x', true).join(' ')).toMatch(/compares another topic/);
+    expect(grounding({ ...base, topicId: '', reply: 'Maybe.', stepId: 'chat:busy-week' }, facts, 'x', true).join(' ')).toMatch(/clear topic/);
   });
 });
