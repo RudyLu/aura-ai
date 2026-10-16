@@ -1,5 +1,5 @@
 'use client';
-// Shared pieces ported from app.js: buttons that dispatch actions, the live Aura orb,
+// Shared pieces ported from app.js: buttons that dispatch actions, the live Aura mark,
 // the 1–5 slider, and the SVG art (kept as markup strings and injected into their
 // parent element, so the CSS sees the same structure as the prototype).
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
@@ -33,7 +33,7 @@ export const Raw = ({ html, cls, tag = 'span', label }: { html: string; cls?: st
 };
 
 export const AuraMark = ({ size = '', state = 'idle' }: { size?: string; state?: string }) => (
-  <span className={`live-aura ${size}`} data-aura-state={state} aria-hidden="true"><span className="aura-atmosphere" /><span className="aura-core" /><span className="aura-ripple" /></span>
+  <span className={`live-aura aura-heart ${size}`} data-aura-state={state} aria-hidden="true"><span className="aura-atmosphere" /><span className="aura-core"><img className="aura-heart-image" src={`/assets/brand/aura-heart-${size === 'aura-hero' || size === 'aura-large' ? 'companion' : 'mark'}-v1.png`} width={1280} height={1280} alt="" draggable={false} /></span><span className="aura-ripple" /></span>
 );
 
 export function Option({ text, on, act, val, sub, type = 'radio' }: { text: string; on: boolean; act: string; val: string; sub?: string; type?: 'radio' | 'check' }) {

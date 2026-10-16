@@ -287,3 +287,27 @@ main.today.todayA { isolation: isolate; }
 .todayA .daysweep { z-index: 1; left: 0; right: 0; width: auto; transform: none; }
 .todayA .todaysky { z-index: 0; }
 .todayA > :not(.daysweep):not(.todaysky) { position: relative; z-index: 2; }
+
+
+/* Aura heart identity: keep the existing wrappers and animation states. */
+.live-aura.aura-heart .aura-core {
+  inset: 0; border-radius: 0; background: none; box-shadow: none; opacity: 1;
+}
+.aura-heart-image { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+.live-aura.aura-heart .aura-atmosphere {
+  inset: 8%; background: radial-gradient(ellipse at 38% 52%, #91a4df22, #eec8a81a 48%, transparent 74%);
+  filter: blur(10px);
+}
+.live-aura.aura-heart .aura-ripple { display: none; }
+.orbhero .aura-heart, .orbtop .aura-heart { filter: none; }
+.aura-brand { width: 40px; height: 40px; }
+.aura-brand .aura-atmosphere, .aura-health .aura-atmosphere { display: none; }
+.aura-health { width: 78px; height: 78px; }
+.splashlogo:has(.aura-brand) { display: flex; align-items: center; gap: 10px; }
+.phone nav .nav-aura, .phone nav .current .nav-aura {
+  display: block; width: 22px; height: 22px; object-fit: contain; border-radius: 0; background: none; box-shadow: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .live-aura.aura-heart[data-aura-state=insight] .aura-core { animation: auraHeartReveal 1.5s ease-out; }
+}
+@keyframes auraHeartReveal { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }

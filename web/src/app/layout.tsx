@@ -7,7 +7,7 @@ import '@/styles/web.css';
 export const metadata: Metadata = {
   title: 'Aura.ai | Understand how you live',
   description: 'Aura.ai. Understand how you live. Connect everyday details, choose a small step, and reflect.',
-  icons: { icon: '/assets/aura-icon.svg' }
+  icons: { icon: { url: '/assets/brand/aura-heart-mark-v1.png', type: 'image/png' } }
 };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-content' };
 

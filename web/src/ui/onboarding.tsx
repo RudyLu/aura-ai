@@ -19,7 +19,7 @@ export function Splash() {
     <section className="splash aura-splash hasvideo">
       <div className="splashvideo" aria-hidden="true"><video poster="/assets/video/onboarding-bg.jpg" autoPlay muted loop playsInline preload="auto"><source src="/assets/video/onboarding-bg.mp4" type="video/mp4" /><source src="/assets/video/onboarding-bg.webm" type="video/webm" /></video></div>
       <div className="aura-opening">
-        <p className="splashlogo"><span className="logotype">Aura<span>.ai</span></span></p>
+        <p className="splashlogo"><AuraMark size="aura-brand" /><span className="logotype">Aura<span>.ai</span></span></p>
         <h1>Understand<br />how you live.</h1>
         <p className="splashmessage">Every life has a glow.<br />We help you see it.</p>
       </div>
@@ -189,7 +189,7 @@ export function SyncScreen({ on, step }: { on: boolean; step?: boolean }) {
   return (
     <main className="syncscreen hkscreen">{step ? <ObHead i={5} /> : null}
       <div className="hkbody">
-        <div className="hkpair" aria-hidden="true"><span className="hkapp aura"><span className="healthauraorb" /></span><span className={`hkmid ${on ? 'done' : ui.importing !== null ? 'spin' : ''}`}><Raw html={on ? CHECK : '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg>'} /></span><span className="hkapp"><Raw cls="healthtile" html={HEALTH_TILE} /></span></div>
+        <div className="hkpair" aria-hidden="true"><span className="hkapp aura"><AuraMark size="aura-health" /></span><span className={`hkmid ${on ? 'done' : ui.importing !== null ? 'spin' : ''}`}><Raw html={on ? CHECK : '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg>'} /></span><span className="hkapp"><Raw cls="healthtile" html={HEALTH_TILE} /></span></div>
         <div className="hktext"><h1>{on ? 'All set. Aura is synced with Apple Health.' : 'Connect Apple Health to see the bigger picture'}</h1><p>{on ? `${h?.via === 'simulated' ? 'Demo data' : h?.via === 'export-xml' ? 'Imported from export.xml' : 'Linked from the Aura app'}. You can change this any time in Settings › Data.` : 'Aura reads these to compare with your check-ins. Read only.'}</p>
           <ul className={`hklist ${on ? 'got' : ''}`}>{rows.filter(([k]) => !on || types[k] !== false).map(([k,t,d]) => <li key={k}><span className={`hkic healthicon-${k}`} aria-hidden="true"><Raw html={HEALTH_ICONS[k]} /></span><span>{t}{!on ? <small>{d}</small> : null}</span>{on && counts ? <b>{counts[k]}</b> : null}</li>)}</ul>
         </div>
