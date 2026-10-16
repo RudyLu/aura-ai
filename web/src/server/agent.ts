@@ -9,7 +9,7 @@
 import { addDays, dateRange, fmtDay, todayISO } from '@/domain/dates';
 import { analyze, describe, findings, MIN_DAYS } from '@/domain/discovery';
 import { daily, sourceLabel } from '@/domain/health';
-import { activeObservations, currentPlans, dayCheckin, type Message, type State, type StepDraft } from '@/domain/state';
+import { activeObservations, currentPlans, dayCheckin, goalObservations, userGoals, type Message, type State, type StepDraft } from '@/domain/state';
 import { STEP_IDS, stepDraft, stepMenu } from '@/domain/steps';
 import { topic, TOPIC_IDS, type TopicId } from '@/domain/topics';
 import { generateJSON, geminiConfigured } from './gemini';
@@ -67,7 +67,8 @@ export function buildFacts(s: State, today: string) {
     facts.push(fact(`plan:${p.id}`, `Current ${p.status === 'observing' ? 'observation (no routine change)' : 'step'} for ${topic(p.topicId).name}: “${p.title}”. ${p.step} From ${p.start} to review on ${p.review}${today >= p.review ? ' (review due)' : ''}. Feedback on ${fbs.length} days: ${done} done, ${partly} partly.${changes.length ? ` Felt compared with before: ${changes.join(', ')}.` : ''}${barriers.length ? ` Got in the way: ${barriers.join(', ')}.` : ''}`));
   }
   const pr = s.profile;
-  facts.push(fact('profile', `Concerns chosen in setup: ${(pr.concerns || []).join(', ') || 'none'}. Already tried: ${pr.attempts.join(', ') || 'nothing listed'}${pr.attemptsNote ? ` (${pr.attemptsNote})` : ''}. Steps should work around: ${pr.constraint}.`));
+  const goals = userGoals(s).map((g, i) => `${g.label}${i === 0 ? ' (priority)' : ''} — tracked by ${goalObservations(s, g.id).map(o => topic(o.topicId).name).join(', ') || 'no check-in yet'}`);
+  facts.push(fact('profile', `Goals, in the user's order: ${goals.join('; ') || 'none'}. Already tried: ${pr.attempts.join(', ') || 'nothing listed'}${pr.attemptsNote ? ` (${pr.attemptsNote})` : ''}. Steps should work around: ${pr.constraint}.`));
   return { facts, allowedFindingSteps };
 }
 

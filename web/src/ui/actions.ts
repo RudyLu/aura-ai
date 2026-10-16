@@ -1,17 +1,19 @@
+import { AuraReplySchema, ReviewSchema } from '@/domain/conversation';
 // Interactions (ported from events.js). Every control calls dispatch(action, value, data),
 // mirroring the prototype's data-act / data-val / data-* attributes. The fake parts are
 // replaced: Aura's replies come from /api/aura (Gemini, grounded), food photos from
 // /api/photo (Gemini vision), and records are saved to this visitor's server session.
 import { addDays, localDateTime, uid } from '@/domain/dates';
-import { analyze, insight } from '@/domain/discovery';
+import { analyze, insight } from '@/domain/uiDiscovery';
+import { stepDraft } from '@/domain/uiSteps';
 import { buildDemo } from '@/domain/demo';
 import { bridge, importExportFile, importFromBridge, seedSample, setDataSource, simulateAppleHealth } from '@/domain/health';
 import {
   acceptPlan, activeObservations, addObservation, blank, currentPlans, dayCheckin, observation, plan as findPlan,
   removeRecord, saveCheckin, saveEntry, setPlanStatus, type CheckinStatus, type Feedback, type HealthImport, type Message, type PhotoExtraction, type StepDraft
 } from '@/domain/state';
-import { GOALS, topic, type TopicId } from '@/domain/topics';
-import { flush, render, resetAll, S, save, setSt, toast, today, ui, type ModalData } from './store';
+import { isGoalId, topic, isTopicId, type TopicId } from '@/domain/topics';
+import { apiUrl, command, switchMode, refreshLinkedHealth, flush, render, resetAll, S, save, setSt, toast, today, ui, type ModalData } from './store';
 
 export type ActData = Record<string, string | undefined>;
 
@@ -20,7 +22,7 @@ export const SAMPLE_PHOTOS = [
   { id: 'salad', src: '/assets/food/salad.jpg', name: 'Spinach salad' },
   { id: 'lasagna', src: '/assets/food/lasagna.jpg', name: 'Lasagna' }
 ];
-export const OB_TITLES = ['What’s been getting in the way lately?', 'Your first observation.', 'When should Aura ask?', 'What have you tried so far?', 'What should a step work around?', 'Sync with Apple Health', 'Check your starting point.'];
+export const OB_TITLES = ['What’s been getting in the way lately?', 'Your first daily check-in.', 'When should Aura ask?', 'What have you tried so far?', 'What should a step work around?', 'Sync with Apple Health', 'Check your starting point.'];
 export const OB_LAST = OB_TITLES.length - 1;
 
 const val = (id: string) => { const el = document.getElementById(id) as HTMLInputElement | null; return el ? el.value : ''; };
@@ -71,9 +73,9 @@ export const focusTopic = (): TopicId => (activeObservations(S())[0] || { topicI
 // ---------- onboarding ----------
 export function startOnboarding() {
   const s = S();
-  ui.ob = { consent: { terms: false, health: false, share: false }, concerns: [], goalId: null, topicId: null, time: null, attempts: [], attemptsNote: '', constraint: 'Keep it simple', data: 'apple-health', types: { sleep: true, activity: true, cycle: true } };
+  ui.ob = { consent: { terms: false, health: false, share: false }, concerns: [], topicId: null, time: null, attempts: [], attemptsNote: '', constraint: 'Keep it simple', data: 'apple-health', types: { sleep: true, activity: true, cycle: true, hrv: true } };
   // Apple Health starts on (simulated unless a real export or the bridge is used); the user can switch it off.
-  if (!s.healthImport) { s.healthImport = simulateAppleHealth(today()); save(); }
+  if (ui.mode === 'demo' && !s.healthImport) { s.healthImport = simulateAppleHealth(today()); save(); }
   ui.step = 0; ui.fromReview = false; ui.page = 'onboarding';
 }
 function saveObFields() {
@@ -83,12 +85,15 @@ function saveObFields() {
 }
 function finishOnboarding() {
   const s = S(), o = ui.ob!;
-  s.profile = { consent: { ...o.consent, at: new Date().toISOString() }, concerns: o.concerns, goalId: (GOALS.find(g => g.topicId === o.topicId) || { id: null }).id, attempts: o.attempts, attemptsNote: o.attemptsNote, constraint: o.constraint, context: [] };
+  // Each concern picked is stored as one goal; goals kept from before keep their order.
+  const kept = (s.profile.goals || []).filter(id => o.concerns.includes(id));
+  s.profile = { ...s.profile, consent: { ...o.consent, at: new Date().toISOString() }, goals: [...kept, ...o.concerns.filter(id => !kept.includes(id))], attempts: o.attempts, attemptsNote: o.attemptsNote, constraint: o.constraint, context: [] };
   s.healthTypes = { ...o.types };
   const obs = addObservation(s, o.topicId!, o.time);
   s.onboarded = true;
   setDataSource(s, o.data === 'apple-health' && !s.healthImport ? 'none' : o.data, today());
   save();
+  ui.todaySweepDone = false;
   ui.page = 'app'; ui.tab = 'today'; ui.ob = null;
   ui.explore.obsId = obs.id;
 }
@@ -131,7 +136,7 @@ async function startHealthLink(el?: HTMLElement | null) {
   render();
   const seqAt = ui.modalSeq;
   try {
-    const res = await fetch('/api/health/link', { method: 'POST' });
+    const res = await fetch(apiUrl('/api/health/link'), { method: 'POST' });
     if (!res.ok) throw new Error();
     const l: { token: string; url: string; appUrl: string; expiresAt: number } = await res.json();
     const { default: QRCode } = await import('qrcode');
@@ -149,11 +154,11 @@ function pollHealthLink(seqAt: number, token: string, expiresAt: number) {
     if (ui.modalSeq !== seqAt) return; // sheet closed: stop
     if (Date.now() > expiresAt) { ui.m.link!.status = 'expired'; render(); return; }
     try {
-      const res = await fetch(`/api/health/link/${token}`);
+      const res = await fetch(apiUrl(`/api/health/link/${token}`));
       const out: { status?: string; import?: HealthImport | null } = await res.json();
       if (ui.modalSeq !== seqAt) return;
       if (out.status === 'done' && out.import) {
-        applyHealthImport(out.import);
+        await refreshLinkedHealth(); if (ui.ob) ui.ob.data = 'apple-health';
         close(); render(); toast('Apple Health connected');
         return;
       }
@@ -170,7 +175,7 @@ export async function readPhoto(body: FormData) {
   Object.assign(ui.m, { picking: false, reading: true, photoError: undefined, extraction: null });
   render();
   try {
-    const res = await fetch('/api/photo', { method: 'POST', body });
+    const res = await fetch(apiUrl('/api/photo'), { method: 'POST', body });
     const out: { photoUrl?: string; extraction?: PhotoExtraction | null; error?: string } = await res.json();
     if (ui.modalSeq !== seqAt) return; // the sheet was closed meanwhile
     if (!res.ok || !out.photoUrl) { Object.assign(ui.m, { reading: false, photoError: out.error || 'Couldn’t upload the photo.' }); render(); return; }
@@ -193,31 +198,49 @@ export function pickDeviceFile(f: File) {
 }
 
 // ---------- Aura ----------
-export async function sendToAura(text: string) {
+function revealLatestAuraMessage() {
+  requestAnimationFrame(() => {
+    if (ui.tab !== 'aura') return;
+    const message = document.querySelector('.messages .cb:last-child');
+    message?.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
+}
+export async function sendToAura(text: string, retry = false, choice?: { messageIndex: number; optionId: string; topicId?: TopicId }) {
   if (ui.pending) return;
   const s = S();
-  s.messages.push({ role: 'user', text });
+  if (!retry) s.messages.push({ role: 'user', text });
+  ui.freshMsg = s.messages.length;
+  ui.chatError = null; ui.failedMessage = null;
   ui.pending = true; ui.auraState = 'understanding'; ui.page = 'app'; ui.tab = 'aura'; ui.logOffer = null; ui.draft = null;
   close(); save(); render();
-  requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
-  let reply: { text: string; action: Message['action']; draft: StepDraft | null; logOffer: typeof ui.logOffer; via: NonNullable<Message['meta']>['via']; cited?: string[]; safety?: { level: string }; stopPlanId?: string | null };
+  revealLatestAuraMessage();
+  let reply: ReturnType<typeof AuraReplySchema.parse>;
+  const abort = new AbortController(); const timeout = setTimeout(()=>abort.abort(),30000);
   try {
     await flush();
-    const res = await fetch('/api/aura', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, today: today() }) });
-    if (!res.ok) throw new Error();
-    reply = (await res.json()).reply;
-  } catch {
-    reply = { text: 'I couldn’t reach Aura just now. Your message is saved; try again in a moment.', action: null, draft: null, logOffer: null, via: 'verified-summary' };
-  }
+    const res = await fetch(apiUrl('/api/aura'), { signal: abort.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, today: today(), inputRevision: S().inputRevision || 0, choice, selectedTopic: choice?.topicId || (ui.explore.obsId ? S().observations.find(o => o.id === ui.explore.obsId)?.topicId || null : null) }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not reach Aura. Try again.');
+    reply = AuraReplySchema.parse(data.reply);
+    if (typeof data.inputRevision === 'number') S().inputRevision = data.inputRevision;
+    if (Array.isArray(data.plans)) S().plans = data.plans;
+  } catch (e) {
+    ui.chatError = e instanceof Error ? e.message : 'Could not reach Aura.';
+    ui.failedMessage = text; ui.pending = false; ui.auraState = 'idle'; render(); return;
+  } finally { clearTimeout(timeout); }
   if (reply.stopPlanId) {
-    const p = findPlan(s, reply.stopPlanId);
-    if (p && p.status === 'active') { setPlanStatus(p, 'stopped'); toast('Step paused'); }
+    const p = findPlan(S(), reply.stopPlanId);
+    if (p && p.status === 'active') {
+      try { await command('decide',{planId:p.id,planVersion:p.version,choice:'stop'}); toast('Step paused'); }
+      catch(e) { ui.chatError = e instanceof Error ? e.message : 'Could not save the paused step.'; }
+    }
   }
-  s.messages.push({ role: 'guide', text: reply.text, action: reply.action || null, meta: { via: reply.via, safety: reply.safety?.level, cited: reply.cited } });
-  ui.draft = reply.draft; ui.logOffer = reply.logOffer;
+  S().messages.push({ role: 'guide', text: reply.text, action: reply.action as Message['action'] || null, meta: { via: reply.via, safety: reply.safety?.level, cited: reply.cited }, interaction: reply.interaction as Message['interaction'], insights: reply.insights, draft: reply.draft as StepDraft | null, logOffer: reply.logOffer as typeof ui.logOffer });
+  ui.freshMsg = S().messages.length;
+  ui.draft = reply.draft as StepDraft || null; ui.logOffer = reply.logOffer as typeof ui.logOffer || null;
   ui.pending = false; ui.auraState = 'insight';
   save(); render();
-  requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  revealLatestAuraMessage();
   setTimeout(() => { ui.auraState = 'idle'; render(); }, 1600);
 }
 
@@ -236,21 +259,31 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
   switch (a) {
     // navigation
     case 'home': if (ui.page === 'app') { ui.tab = 'today'; close(); } break;
-    case 'tab': ui.page = 'app'; ui.tab = v as typeof ui.tab; close(); break;
+    case 'tab': if (v === 'aura' && ui.tab !== 'aura') ui.previousTab = ui.tab; ui.page = 'app'; ui.tab = v as typeof ui.tab; close(); break;
+    case 'aura-close': {
+      const page=document.querySelector('.chatpage');
+      if(page && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+        if(page.classList.contains('leaving')) return;
+        page.classList.add('leaving');
+        setTimeout(()=>{ui.tab=ui.previousTab;close();render();window.scrollTo(0,0);},240);return;
+      }
+      ui.tab=ui.previousTab;close();break;
+    }
     case 'begin': startOnboarding(); break;
     case 'demo': openModal('demo', {}, el); break;
+    case 'demo-personal': switchMode('personal').catch(e => err(e.message)); return;
     case 'demo-load': {
-      const mine = !s.demo && (s.checkins.some(c => c.source !== 'sample') || s.entries.some(e => e.source !== 'sample'));
-      if (mine && !confirmTap(key)) return;
-      setSt(buildDemo(+v!, new Date()));
-      save();
-      Object.assign(ui, { page: 'app', tab: 'today', modal: null, m: {}, draft: null, logOffer: null, explore: { obsId: activeObservations(S())[0]?.id || null, range: 7, date: null, metric: 'all' }, chartPlayed: false });
-      toast(`Demo timeline: day ${v}`);
-      break;
+      if (!confirmTap(key)) { toast('Tap the same timeline again to confirm. Personal records are kept.'); return; }
+      (async () => {
+        await switchMode('demo');
+        await command('demo', { day: Number(v), now: new Date().toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+        ui.page = 'app'; ui.tab = 'today'; ui.modal = null; ui.reviewResult = null; render();
+      })().catch(e => err(e.message)); return;
     }
     case 'open': {
       const m: ModalData = { obsId: d.obs, recId: d.rec, planId: d.plan, date: d.date, doc: d.doc };
-      if (ui.modal === 'settings') m.back = 'settings';
+      if (ui.modal === 'settings' || ui.modal === 'goals') m.back = ui.modal;
+      if (isTopicId(d.topic)) m.topicId = d.topic;
       if (d.choice) m.choice = d.choice;
       if (v === 'checkin' && !d.rec && !d.keepDate && d.date === undefined) m.date = ui.tab === 'explore' ? ui.explore.date || undefined : undefined;
       if (v === 'caffeine' && ui.tab === 'explore' && !d.rec && !d.date) m.date = ui.explore.date || undefined;
@@ -259,6 +292,9 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       openModal(v!, m, el);
       break;
     }
+    case 'chat-photo': openModal('food',{picking:true},el); break;
+    case 'chat-retry': if (ui.failedMessage) sendToAura(ui.failedMessage, true); return;
+    case 'nextup-shuffle': ui.nextUp = (ui.nextUp || 0) + 1; break;
     case 'close': close(); break;
     case 'backdrop': close(); break;
     case 'goals-toggle': ui.goalsOpen = !ui.goalsOpen; break;
@@ -304,7 +340,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       saveObFields();
       const o = ui.ob!;
       if (ui.step === 0 && !o.concerns.length) return err('Choose at least one.');
-      if (ui.step === 1 && !o.topicId) return err('Choose an observation to continue.');
+      if (ui.step === 1 && !o.topicId) return err('Choose a check-in to continue.');
       if (ui.step === 2 && !o.time) o.time = topic(o.topicId).timing.defaultTime;
       if (ui.step === OB_LAST && !(o.consent.terms && o.consent.health)) return err('Agree to the terms and allow data use to start.');
       if (ui.step === OB_LAST) finishOnboarding();
@@ -335,10 +371,8 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       const c = o && dayCheckin(s, o.id, today());
       if (!o || !p || !c) { close(); break; }
       const fb: Feedback = { id: uid('fb'), planId: p.id, planVersion: p.version, observationId: o.id, date: today(), at: new Date().toISOString(), execution: v === 'yes' ? 'Done' : 'Not done', answer: c.status === 'recorded' ? String(c.score) : c.status, score: c.score, change: 'Not answered', barriers: [], note: '' };
-      s.feedbacks.push(fb); c.feedbackId = fb.id;
-      save();
-      openModal('review', { planId: p.id });
-      break;
+      ui.saving = true; render();
+      command('feedback', { ...fb, change: 'Not answered', barriers: [], occurredAt: localDateTime() }).then(() => openModal('review', { planId: p.id })).catch(e => err(e.message)).finally(() => { ui.saving = false; render(); }); return;
     }
     case 'quick-save': {
       // Save straight from Today: now, with the slider's answer.
@@ -351,7 +385,9 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       break;
     }
     case 'checkin-topic': {
-      const o = ensureObservation(v as TopicId);
+      if (!isTopicId(v)) return err('Choose a valid check-in topic.');
+      const o = activeObservations(s).find(o => o.topicId === v);
+      if (!o) { openModal('addobs', { topicId: v }, el); break; }
       const note = ui.logOffer?.note || '';
       ui.logOffer = null;
       openModal('checkin', { obsId: o.id, note }, el);
@@ -370,6 +406,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       if (rec && rec.feedbackId) { const f = s.feedbacks.find(x => x.id === rec.feedbackId); if (f) { f.answer = ui.m.choice; f.score = recorded ? +ui.m.choice : null; } }
       save();
       if (!rec && time.slice(0, 10) === today()) { openModal('done', { obsId: o.id }); break; }
+      if (ui.tab === 'aura') ui.nextUp = 0;
       toast(rec ? 'Correction saved' : 'Check-in saved');
       close();
       break;
@@ -386,13 +423,15 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       const name = val('food-name').trim(), time = val('food-time');
       if (!name) return err('Add a food or drink name.', '#food-name');
       if (!time) return err('Add when you had it.', '#food-time');
+      if (time > localDateTime()) return err('This time is in the future.', '#food-time');
       if (ui.m.reading) return err('Still reading the photo…');
-      const caffeine = checked('food-caffeine');
+      const caffeine = val('food-caffeine') as 'yes' | 'no' | 'unknown';
       const photo = ui.m.photo && !ui.m.photo.startsWith('blob:') ? ui.m.photo : undefined;
-      saveEntry(s, { id: ui.m.recId, kind: 'food', name, occurredAt: time, note: val('food-note').trim(), photoUrl: photo, extracted: ui.m.extraction ?? undefined });
+      saveEntry(s, { id: ui.m.recId, kind: 'food', caffeinated: caffeine, name, occurredAt: time, note: val('food-note').trim(), photoUrl: photo, extracted: ui.m.extraction ?? undefined });
       save();
+      if (ui.tab === 'aura') ui.nextUp = 0;
       toast(ui.m.recId ? 'Correction saved' : `${name} saved`);
-      if (caffeine) openModal('caffeine', { time, drink: ui.m.drink, size: '' }); else close();
+      if (caffeine === 'yes') openModal('caffeine', { time, drink: ui.m.drink, size: '' }); else close();
       break;
     }
     case 'photo-pick-open': ui.m.picking = true; break;
@@ -407,8 +446,10 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'save-drink': {
       const time = val('drink-time'), raw = val('drink-mg'), mg = raw === '' ? null : Number(raw);
       if (!time) return err('Add when you drank it.', '#drink-time');
+      if (time > localDateTime()) return err('This time is in the future.', '#drink-time');
       if (mg !== null && (!Number.isFinite(mg) || mg < 0 || mg > 2000)) return err('Enter 0–2000 mg, or leave it blank if unknown.', '#drink-mg');
-      saveEntry(s, { id: ui.m.recId || undefined, kind: 'caffeine', name: val('drink-type'), size: val('drink-size').trim(), occurredAt: time, mg, note: val('drink-note').trim() });
+      saveEntry(s, { id: ui.m.recId || undefined, kind: 'caffeine', caffeinated: 'yes', name: val('drink-type'), size: val('drink-size').trim(), occurredAt: time, mg, note: val('drink-note').trim() });
+      if (ui.tab === 'aura') ui.nextUp = 0;
       save(); toast(ui.m.recId ? 'Correction saved' : 'Drink saved'); close(); break;
     }
     case 'log-offer': {
@@ -423,11 +464,12 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'save-obsedit': {
       const o = observation(s, ui.m.obsId)!, time = val('obsedit-time');
       if (!time) return err('Choose a time.', '#obsedit-time');
-      o.time = time; save(); toast(`${topic(o.topicId).name} at ${time}`); close(); break;
+      o.time = time;
+      save(); toast(`${topic(o.topicId).name} at ${time}`); close(); break;
     }
     case 'pause-obs': {
       if (!confirmTap(key)) return;
-      const o = observation(s, ui.m.obsId)!; o.status = 'paused'; save(); toast(`Stopped observing ${topic(o.topicId).name.toLowerCase()}`); close(); break;
+      const o = observation(s, ui.m.obsId)!; o.status = 'paused'; save(); toast(`Paused the ${topic(o.topicId).name.toLowerCase()} check-in`); close(); break;
     }
     case 'pick-topic': ui.m.topicId = v as TopicId; break;
     case 'save-obs': { const o = addObservation(s, ui.m.topicId!, val('obs-time')); if (s.dataSource === 'sample') seedSample(s, o, today()); save(); ui.explore.obsId = o.id; toast(`${topic(o.topicId).name} added`); close(); break; }
@@ -436,53 +478,55 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'exp-metric': ui.explore.metric = v!; break;
     case 'exp-range-set': ui.explore.range = +v!; break;
     case 'goal-remove': {
-      s.profile.concerns = (s.profile.concerns || []).filter(x => x !== v); save();
+      // Check-ins and records stay; only the goal goes.
+      s.profile.goals = (s.profile.goals || []).filter(id => id !== v); save();
       toast('Removed the goal. Add it back in Settings.');
       break;
     }
-    case 'exp-goto': if (v! < addDays(today(), -(ui.explore.range - 1))) ui.explore.range = 14; ui.explore.date = v!; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
-    case 'health-toggle': {
-      const on = (ui.ob ? ui.ob.data : s.dataSource) === 'apple-health' && !!s.healthImport;
-      if (on) { if (ui.ob) ui.ob.data = 'none'; else { setDataSource(s, 'none', today()); save(); } toast('Apple Health off'); break; }
-      openModal('healthperm', { from: ui.modal === 'data' ? 'data' : null }, el);
-      break;
+    case 'goal-toggle': {
+      if (!isGoalId(v)) return;
+      const goals = s.profile.goals || [];
+      if (goals.includes(v)) { if (goals.length === 1) return err('Keep at least one goal.'); s.profile.goals = goals.filter(id => id !== v); }
+      else s.profile.goals = [...goals, v];
+      save(); break;
     }
-    case 'health-allow': {
-      const types = ui.ob ? ui.ob.types : s.healthTypes;
-      for (const k of ['sleep', 'activity', 'cycle'] as const) types[k] = checked('perm-' + k);
-      if (!types.sleep && !types.activity && !types.cycle) return err('Choose at least one, or tap Don’t allow.', '#perm-sleep');
-      if (!s.healthImport || s.healthImport.via === 'simulated') s.healthImport = simulateAppleHealth(today());
-      if (ui.ob) ui.ob.data = 'apple-health'; else { s.healthTypes = types; setDataSource(s, 'apple-health', today()); }
-      save();
-      const reopen = !ui.ob && ui.m.from === 'data';
-      close(); if (reopen) openModal('data');
-      toast('Apple Health connected (simulated)');
+    case 'exp-goto': if (v! < addDays(today(), -(ui.explore.range - 1))) ui.explore.range = 14; ui.explore.date = v!; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+    case 'health-toggle': openModal('data', {}, el); break;
+    case 'health-use-toggle': {
+      if (!s.healthImport) return;
+      const on = (ui.ob ? ui.ob.data : s.dataSource) === 'apple-health';
+      if (ui.ob) ui.ob.data = on ? 'none' : 'apple-health';
+      else { setDataSource(s, on ? 'none' : 'apple-health', today()); save(); }
       break;
     }
     case 'sample-toggle':
+      if (ui.mode === 'personal') { openModal('demo', {}, el); break; }
       setDataSource(s, s.dataSource === 'sample' ? 'none' : 'sample', today()); save();
       toast(s.dataSource === 'sample' ? 'Sample history on' : 'Sample history off');
       break;
-    case 'clear-health': if (!confirmTap(key)) return; fetch('/api/health/import', { method: 'DELETE' }).catch(() => {}); s.healthImport = null; if (s.dataSource === 'apple-health') setDataSource(s, 'none', today()); save(); break;
+    case 'clear-health': {
+      if (!confirmTap(key) || ui.saving) return;
+      ui.saving=true;render();
+      (async()=>{await flush();const res=await fetch(apiUrl('/api/health/import'),{method:'DELETE'});if(!res.ok)throw new Error('Could not remove health data. Try again.');S().healthImport=null;if(S().dataSource==='apple-health')setDataSource(S(),'none',today());save();await flush();toast('Apple Health data removed');})().catch(e=>err(e.message)).finally(()=>{ui.saving=false;render();});return;
+    }
 
     // Aura & plans
     case 'prompt': sendToAura(v!); return;
     case 'adjust-chat': sendToAura('Help me adjust this step for a busy week.'); return;
-    case 'observe': ui.draft = { topicId: ui.draft?.topicId || focusTopic(), kind: 'observe', title: 'Keep checking in, with no routine change', desc: 'Observe at your pace.', duration: '20 sec', days: 'When it fits', step: '' }; openModal('accept', {}, el); break;
+    case 'observe': { const id = ui.draft?.topicId; if (!id) return err('Choose a check-in topic first.'); ui.draft = stepDraft(`observe:${id}`, id); openModal('accept', {}, el); break; }
     case 'plan-obs': ui.m.target = d.value; break;
     case 'confirm-plan': {
-      const draft = ui.draft!;
-      const start = val('plan-start'), review = val('plan-review'), step = draft.kind === 'observe' ? 'No routine change. Answer the check-in when it fits.' : val('plan-step').trim();
-      if (!step) return err('Describe what you will do.', '#plan-step');
-      if (!start) return err('Add a start date.', '#plan-start');
-      if (!review || review < start) return err('Choose a review date on or after the start.', '#plan-review');
-      const target = val('plan-obs');
-      const o = target.startsWith('new:') ? ensureObservation(target.slice(4) as TopicId) : observation(s, target)!;
-      const p = acceptPlan(s, draft, { step, start, review, observationId: o.id, topicId: o.topicId });
-      s.messages.push({ role: 'guide', action: { type: 'feedback', planId: p.id }, text: p.status === 'observing' ? `You’re observing ${topic(o.topicId).name.toLowerCase()} with no routine change. Answer your check-in when it fits.` : `Your step is saved and linked to ${topic(o.topicId).name.toLowerCase()}. When you’ve tried it, tell me how it went. What you did and how you felt are kept separate.` });
-      ui.draft = null; close(); save(); ui.page = 'app'; ui.tab = 'aura'; toast('Step saved');
-      break;
+      if (ui.saving || !ui.draft) return;
+      const draft = ui.draft, target = ui.m.target || activeObservations(s).find(o => o.topicId === draft.topicId)?.id;
+      const reviewId = ui.m.aiReviewId, requestId = ui.m.requestId;
+      const source = reviewId ? s.aiReviews?.find(r => r.id === reviewId) : null;
+      const step = draft.kind === 'observe' ? draft.step : val('plan-step');
+      ui.saving = true; render();
+      command('accept', { stepId: draft.stepId, topicId: draft.topicId, observationId: target, step, start: val('plan-start'), review: val('plan-review'), aiReviewId: reviewId, requestId, planId: source?.planId }).then(() => {
+        ui.draft = null; const lastGuide = S().messages.findLast(m=>m.role==='guide'); if(lastGuide) lastGuide.draft=null; save(); close(); ui.page = 'app'; ui.tab = 'aura'; toast('Step saved');
+      }).catch(e => err(e.message)).finally(() => { ui.saving = false; render(); }); return;
     }
+
     case 'feedback': {
       const p = findPlan(s, d.plan)!;
       const existing = s.feedbacks.find(f => f.planId === p.id && f.date === today());
@@ -497,51 +541,78 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'fb-next': {
       const fd = ui.fb.d;
       if (ui.fb.step === 0 && !fd.execution) return err('Choose an answer, including Not sure.');
-      if (ui.fb.step === 1) { if (!fd.answer) return err('Slide to answer, or choose “Not sure” or “Skip today”.'); fd.change = val('fb-change'); }
+      if (ui.fb.step === 1) { if (!fd.answer) return err('Slide to answer, or choose “Not sure” or “Skip today”, or save your words only.'); fd.change = val('fb-change'); }
       if (ui.fb.step < 2) { ui.fb.step++; break; }
       fd.note = val('fb-note').trim();
       const p = findPlan(s, ui.fb.planId)!;
-      const answer = String(fd.answer);
-      const recorded = /^[1-5]$/.test(answer);
-      const fb = { ...fd, id: (fd.id as string) || uid('fb'), planId: p.id, planVersion: p.version, observationId: p.observationId, date: (fd.date as string) || today(), at: new Date().toISOString(), score: recorded ? +answer : null } as Feedback;
-      s.feedbacks = s.feedbacks.filter(f => f.id !== fb.id).concat(fb);
-      const linked = s.checkins.find(c => c.feedbackId === fb.id);
-      saveCheckin(s, { id: linked?.id, createdAt: linked?.createdAt, observationId: p.observationId, topicId: p.topicId, source: 'plan feedback', feedbackId: fb.id, occurredAt: linked?.occurredAt || localDateTime(), status: (recorded ? 'recorded' : answer) as CheckinStatus, score: recorded ? +answer : null, note: fb.note || '' });
-      // Reporting "worse" or "felt unwell" pauses the step (PRD §7.3 rule 4).
-      if (fb.change === 'Worse' || (fb.barriers || []).includes('Felt unwell')) {
-        if (p.status === 'active') { setPlanStatus(p, 'stopped'); s.messages.push({ role: 'guide', text: 'You reported feeling worse, so I’ve paused this step rather than pushing on. Your records are kept. If it continues or concerns you, please talk with a health professional.', meta: { via: 'safety', safety: 'worse' } }); }
-      }
-      save();
-      openModal('review', { planId: p.id });
-      toast('Feedback saved');
-      break;
+      if (ui.saving) return;
+      ui.saving = true; fd.id ||= uid('fb'); render();
+      command('feedback', { ...fd, id: fd.id, date: fd.date || today(), occurredAt: `${fd.date || today()}T${localDateTime().slice(11,16)}`, planId: p.id, planVersion: p.version, change: fd.change || 'Not answered', barriers: fd.barriers || [] }).then(() => {
+        ui.reviewStatus = 'idle'; ui.reviewResult = null; openModal('review', { planId: p.id }); toast('Feedback saved');
+      }).catch(e => err(e.message)).finally(() => { ui.saving = false; render(); }); return;
+    }
+    case 'review-ai': requestReview(ui.m.planId!); return;
+    case 'review-accept': {
+      const r = ui.reviewResult || s.aiReviews?.filter(r => r.planId === ui.m.planId).at(-1);
+      if (!r?.proposal) return;
+      ui.draft = r.proposal; openModal('accept', { target: s.plans.find(p => p.id === r.planId)?.observationId, aiReviewId: r.id, requestId: r.requestId }); break;
     }
     case 'decide': {
       const p = findPlan(s, ui.m.planId)!;
-      s.decisions.push({ id: uid('dec'), choice: v!, reason: '', planId: p.id, version: p.version, at: new Date().toISOString() });
-      if (v === 'adjust') { ui.draft = { topicId: p.topicId, kind: p.kind, lineageId: p.lineageId, title: p.title, desc: p.desc, duration: p.duration, days: p.days, step: p.step }; save(); openModal('accept', { target: p.observationId }); break; }
-      if (v === 'stop') setPlanStatus(p, 'stopped');
-      if (v === 'observe' && p.status !== 'observing') { setPlanStatus(p, 'observing'); p.kind = 'observe'; }
-      if (v === 'continue' && p.status !== 'active') setPlanStatus(p, p.kind === 'observe' ? 'observing' : 'active');
-      s.messages.push({ role: 'guide', action: v === 'stop' ? null : { type: 'feedback', planId: p.id }, text: v === 'stop' ? 'The step is stopped. Its history and your records are kept.' : v === 'observe' ? 'No step to do now. Keep answering your check-in when it fits.' : 'Continuing as planned. Add feedback whenever it fits.' });
-      save(); close(); toast('Decision saved');
-      break;
+      if (v === 'adjust') { ui.reviewStatus = 'idle'; requestReview(p.id); return; }
+      if (ui.saving) return;
+      ui.saving = true; render();
+      const r = ui.reviewResult || s.aiReviews?.filter(r => r.planId === p.id).at(-1);
+      command('decide', { planId: p.id, planVersion: p.version, choice: v, aiReviewId: r?.id, requestId: r?.requestId }).then(() => { close(); toast('Decision saved'); }).catch(e => err(e.message)).finally(() => { ui.saving = false; render(); }); return;
     }
+    case 'cycle-context': s.profile.includeCycleContext = d.checked === '1'; save(); break;
+    case 'demo-ai-consent': s.profile.includeDemoInAI = d.checked === '1'; save(); break;
+    case 'caffeine-none': {
+      const date = ui.m.date || today();
+      (s.caffeineCoverage ||= []).push({ id: uid('cov'), from: `${date}T00:00`, to: date === today() ? localDateTime() : `${addDays(date,1)}T00:00`, status: 'no', confirmed: true, origin: ui.mode === 'demo' ? 'demo-live' : 'personal' }); save(); toast(date === today() ? 'No caffeine confirmed up to now' : 'No caffeine confirmed for this day'); close(); break;
+    }
+    case 'profile-save': s.profile.constraint = val('profile-constraint').trim() || 'Keep it simple'; save(); toast('Constraints saved'); break;
+    case 'goal-priority': { const goals = s.profile.goals || []; if (goals.includes(v!)) { s.profile.goals = [v!, ...goals.filter(id => id !== v)]; save(); } break; }
+    case 'exp-week': ui.explore.week = Math.min(0, (ui.explore.week || 0) + Number(v)); break;
 
     // about
     case 'resetup': {
       close(); startOnboarding();
       const o = activeObservations(s)[0];
-      Object.assign(ui.ob!, { consent: Object.assign({ terms: false, health: false, share: false }, s.profile.consent || {}), concerns: s.profile.concerns || [], rankedFor: (s.profile.concerns || []).join(','), goalId: s.profile.goalId, topicId: o?.topicId || null, time: o?.time || null, attempts: s.profile.attempts || [], attemptsNote: s.profile.attemptsNote || '', constraint: s.profile.constraint, data: s.dataSource, types: { ...s.healthTypes } });
+      Object.assign(ui.ob!, { consent: Object.assign({ terms: false, health: false, share: false }, s.profile.consent || {}), concerns: s.profile.goals || [], rankedFor: (s.profile.goals || []).join(','), topicId: o?.topicId || null, time: o?.time || null, attempts: s.profile.attempts || [], attemptsNote: s.profile.attemptsNote || '', constraint: s.profile.constraint, data: s.dataSource, types: { ...s.healthTypes } });
       ui.step = OB_LAST;
       break;
     }
     case 'reset': {
       if (!confirmTap(key)) return;
-      resetAll().then(() => { setSt(blank()); Object.assign(ui, { page: 'splash', tab: 'today', modal: null, m: {}, draft: null, logOffer: null }); render(); });
+      resetAll().then(() => { Object.assign(ui, { page: 'splash', tab: 'today', modal: null, m: {}, draft: null, logOffer: null }); render(); }).catch(e=>err(e.message));
       return;
     }
     default: return;
   }
   done();
+}
+
+export async function requestReview(planId: string) {
+  if (ui.reviewStatus === 'loading') return;
+  ui.reviewStatus = 'loading'; ui.reviewError = null; ui.reviewResult = null; render();
+  const mode = ui.mode, modalSeq = ui.modalSeq;
+  const abort = new AbortController(); const timeout = setTimeout(()=>abort.abort(),25000);
+  try {
+    await flush();
+    const p = S().plans.find(p => p.id === planId); if (!p) throw new Error('Plan not found');
+    const revision = S().inputRevision || 0;
+    const requestId=uid('rvq');
+    const res = await fetch(apiUrl('/api/review'), { signal: abort.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planId, planVersion: p.version, inputRevision: revision, requestId, today: today() }) });
+    const data = await res.json();
+    if (mode !== ui.mode || modalSeq !== ui.modalSeq) return;
+    if (data.status === 'not-integrated') { ui.reviewStatus = 'not-integrated'; return; }
+    if (!res.ok || data.status !== 'ok') throw new Error(data.error || 'Review unavailable');
+    data.result = ReviewSchema.parse(data.result);
+    if (data.result.requestId !== requestId || data.result.planId !== p.id || data.result.planVersion !== p.version || data.result.mode !== mode || data.result.inputRevision !== revision) throw new Error('Review response does not match this plan and records.');
+    if (revision !== (S().inputRevision || 0)) throw new Error('Records changed. Review again.');
+    if (data.inputRevision !== undefined) { S().inputRevision=data.inputRevision; S().plans=data.plans; S().safetyEvents=data.safetyEvents; }
+    (S().aiReviews ||= []).push(data.result); ui.reviewResult = data.result; ui.reviewStatus = 'idle';
+  } catch (e) { ui.reviewStatus = 'error'; ui.reviewError = e instanceof Error ? e.message : 'Review failed'; }
+  finally { clearTimeout(timeout); if (ui.reviewStatus === 'loading') ui.reviewStatus = 'idle'; render(); }
 }

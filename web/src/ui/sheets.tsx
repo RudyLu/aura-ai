@@ -2,14 +2,14 @@
 // Bottom sheets (ported from sheets.js and demo.js sheet()).
 import { useEffect, useRef } from 'react';
 import { addDays, daysBetween, dateRange, fmtDate, fmtDay, localDateTime } from '@/domain/dates';
-import { analyze, factorsFor, findings, MIN_DAYS } from '@/domain/discovery';
+import { analyze, factorsFor, findings, MIN_DAYS } from '@/domain/uiDiscovery';
 import { SCENARIOS } from '@/domain/demo';
 import { daily, healthSummary } from '@/domain/health';
-import { activeObservations, currentPlans, dayCheckin, observation, plan as findPlan } from '@/domain/state';
-import { CONCERNS, topic, TOPIC_IDS } from '@/domain/topics';
+import { activeObservations, currentPlans, dayCheckin, goalObservations, goalsForTopic, observation, plan as findPlan, userGoals } from '@/domain/state';
+import { CONCERN_GROUPS, GOAL_CATALOG, topic, TOPIC_IDS, type TopicId } from '@/domain/topics';
 import { Btn, CHECK, checkinStatus, ErrorLine, flower, goalArt, Option, Raw, ScalePreview, ScaleSlider } from './core';
 import { dispatch, pickDeviceFile, SAMPLE_PHOTOS } from './actions';
-import { HealthImportControls } from './onboarding';
+import { HEALTH_ICONS, HealthImportControls } from './onboarding';
 import { PLAN_STATUS } from './today';
 import { S, today, ui } from './store';
 
@@ -87,10 +87,7 @@ function FoodSheet() {
       <label className="inputlabel">Food or drink<input key={`n${k}`} id="food-name" defaultValue={rec?.name || ui.m.name || ''} placeholder="e.g. Sandwich and iced latte" /></label>
       <label className="inputlabel">When did you have it?<input id="food-time" type="datetime-local" defaultValue={rec?.occurredAt || ui.m.time || localDateTime()} /></label>
       <label className="inputlabel">Notes <small>Optional</small><input key={`o${k}`} id="food-note" defaultValue={rec?.note || ui.m.note || ''} placeholder="Anything you want to remember" /></label>
-      {rec ? null : (
-        <label className="permission"><div><strong>Includes a caffeinated drink</strong>{x && x.caffeinated === 'unsure' ? <small>Not sure from the photo. Please check.</small> : null}</div>
-          <input key={`c${k}`} id="food-caffeine" type="checkbox" defaultChecked={!!ui.m.caffeine} /></label>
-      )}
+      <label className="inputlabel">Caffeinated drink?<select key={`c${k}`} id="food-caffeine" defaultValue={rec?.caffeinated || (x?.caffeinated === 'yes' ? 'yes' : x?.caffeinated === 'no' ? 'no' : 'unknown')}><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label>
       <Btn act="save-food" disabled={ui.m.reading}>{rec ? 'Save correction' : 'Confirm and save'}</Btn>
       {rec ? <Btn act="delete-record" data={{ kind: 'entry', rec: rec.id }} cls="text danger">Delete this record</Btn> : null}
       <ErrorLine />
@@ -108,6 +105,7 @@ function CaffeineSheet() {
       <label className="inputlabel">When did you drink it?<input id="drink-time" type="datetime-local" defaultValue={when} /></label>
       <label className="inputlabel">Caffeine amount <small>Optional, mg from a label</small><input id="drink-mg" type="number" min={0} max={2000} step="any" defaultValue={rec?.mg ?? ''} placeholder="Leave blank if unknown" /></label>
       <label className="inputlabel">Note <small>Optional</small><input id="drink-note" defaultValue={rec?.note || ''} /></label>
+      {!rec ? <Btn act="caffeine-none" cls="text">Confirm no caffeine up to this time</Btn> : null}
       <Btn act="save-drink">{rec ? 'Save correction' : 'Save drink'}</Btn>
       {rec ? <Btn act="delete-record" data={{ kind: 'entry', rec: rec.id }} cls="text danger">Delete this record</Btn> : null}
       <ErrorLine />
@@ -115,7 +113,12 @@ function CaffeineSheet() {
   );
 }
 
-// ---------- add observation ----------
+// ---------- add check-in ----------
+// Which of the user's goals a check-in serves comes from the goal table, not from stored links.
+function GoalFit({ topicId }: { topicId: TopicId }) {
+  const goals = goalsForTopic(S(), topicId);
+  return <p className="soft">{goals.length ? `Suits your goals: ${goals.map(g => g.label.toLowerCase()).join(', ')}.` : 'None of your goals list this check-in. You can still track it.'}</p>;
+}
 function AddObsSheet() {
   const active = activeObservations(S()).map(o => o.topicId);
   const choices = TOPIC_IDS.filter(id => !active.includes(id));
@@ -123,52 +126,35 @@ function AddObsSheet() {
   const t = topic(ui.m.topicId);
   return (
     <>
-      <p className="eyebrow">New observation</p><h2>Notice something else.</h2><p>Each one has its own question and time.</p>
+      <p className="eyebrow">New check-in</p><h2>Notice something else.</h2><p>Each one has its own question and time.</p>
       <div className="options" role="radiogroup">{choices.map(id => <Option key={id} text={topic(id).name} on={id === ui.m.topicId} act="pick-topic" val={id} sub={topic(id).question} />)}</div>
       <ScalePreview topicId={ui.m.topicId!} />
       <label className="inputlabel">Check-in time <small>{t.timing.label}</small><input key={t.id} id="obs-time" type="time" defaultValue={t.timing.defaultTime} /></label>
-      <Btn act="save-obs">Add observation</Btn>
+      <GoalFit topicId={ui.m.topicId!} />
+      <Btn act="save-obs">Add check-in</Btn>
     </>
   );
 }
 
 // ---------- data sources ----------
-const Switch = ({ act, on, label }: { act: string; on: boolean; label: string }) => (
-  <button type="button" className="switch" role="switch" aria-checked={on} aria-label={label} onClick={e => dispatch(act, undefined, {}, e.currentTarget)}><i /></button>
+const Switch = ({ act, on, label, v }: { act: string; on: boolean; label: string; v?: string }) => (
+  <button type="button" className="switch" role="switch" aria-checked={on} aria-label={label} onClick={e => dispatch(act, v, {}, e.currentTarget)}><i /></button>
 );
 function DataSheet() {
-  const s = S();
-  const on = s.dataSource === 'apple-health' && !!s.healthImport;
-  const h = s.healthImport;
+  const s = S(), h = s.healthImport;
+  const on = (ui.ob ? ui.ob.data : s.dataSource) === 'apple-health' && !!h;
+  const types = ui.ob ? ui.ob.types : s.healthTypes;
   return (
     <>
-      <p className="eyebrow">Data sources</p><h2>Sleep and movement</h2>
-      <div className="synccard"><span className="synclabel">Apple Health<small>{on && h ? healthSummary(h) + (h.via === 'simulated' ? ' · simulated' : '') : 'Off'}</small></span><Switch act="health-toggle" on={on} label="Apple Health" /></div>
-      {on ? (
-        <fieldset className="typepicker"><legend>Sharing</legend>
-          {([['sleep', 'Sleep'], ['activity', 'Movement'], ['cycle', 'Period dates']] as const).map(([k, t]) => (
-            <label className="permission" key={k}><div><strong>{t}</strong></div><input type="checkbox" checked={s.healthTypes[k]} onChange={e => dispatch('toggle-type', k, { checked: e.target.checked ? '1' : '' })} /></label>
-          ))}
-        </fieldset>
-      ) : null}
-      <div className="synccard"><span className="synclabel">Sample history<small>Fictional check-ins, coffee, sleep and movement for demos</small></span><Switch act="sample-toggle" on={s.dataSource === 'sample'} label="Sample history" /></div>
-      <details className="realimport"><summary>Use your real Apple Health data</summary><HealthImportControls /></details>
-      {h ? <Btn act="clear-health" cls="text danger">Remove Apple Health data</Btn> : null}
-    </>
-  );
-}
-
-function HealthPermSheet() {
-  const types = ui.ob ? ui.ob.types : S().healthTypes;
-  return (
-    <>
-      <p className="eyebrow">Simulated permission · prototype</p><h2>Aura would like to read your health data</h2><p>Read only. You can change this any time.</p>
-      <fieldset className="typepicker">{([['sleep', 'Sleep', 'Time asleep each night'], ['activity', 'Exercise minutes', 'Daily total'], ['cycle', 'Period dates', 'Dates only; no predictions']] as const).map(([k, t, d]) => (
-        <label className="permission" key={k}><div><strong>{t}</strong><small>{d}</small></div><input type="checkbox" id={`perm-${k}`} defaultChecked={types[k]} /></label>
+      <h2>Health data preferences</h2>
+      <div className="synccard"><span className="synclabel">Apple Health<small>{h ? `${on ? 'In use' : 'Not in use'} · ${healthSummary(h)}${h.via === 'simulated' ? ' · simulated' : ''}` : 'Not linked'}</small></span>{h ? <Switch act="health-use-toggle" on={on} label="Use Apple Health data" /> : null}</div>
+      <fieldset className="typepicker"><legend>Data Aura can use</legend>{([['sleep', 'Sleep', 'Time asleep each night'], ['activity', 'Exercise minutes', 'Daily total'], ['cycle', 'Period dates', 'Dates only; no predictions'], ['hrv', 'HRV', 'Timestamped SDNN, workouts and mindful sessions']] as const).map(([k, t, d]) => (
+        <label className="permission healthpreference" key={k}><Raw cls="hkic" html={HEALTH_ICONS[k]} /><div><strong>{t}</strong><small>{d}</small></div><input className="iosswitch green" type="checkbox" checked={types[k]} onChange={e => dispatch(ui.ob ? 'ob-type' : 'toggle-type', k, { checked: e.target.checked ? '1' : '' })} /></label>
       ))}</fieldset>
-      <Btn act="health-allow">Allow</Btn><Btn act="close" cls="text">Don’t allow</Btn>
-      <ErrorLine />
-      <p className="soft">A browser can’t read Apple Health directly. Allowing loads 30 days of fictional records, labeled “simulated”. For your real data, link the Aura iOS app or use an export.xml.</p>
+      <p className="soft">Preferences are saved as you change them. Apple Health permission is granted in the iPhone app. These preferences do not change your iPhone permissions.</p>
+      <HealthImportControls />
+      {ui.mode === 'personal' ? <Btn act="demo" cls="text">Switch to Demo</Btn> : <div className="synccard"><span className="synclabel">Demo sample history<small>Fictional records, separate from your personal data</small></span><Switch act="sample-toggle" on={s.dataSource === 'sample'} label="Demo sample history" /></div>}
+      {h ? <Btn act="clear-health" cls="text danger">Remove Apple Health data</Btn> : null}
     </>
   );
 }
@@ -179,7 +165,7 @@ function HealthLinkSheet() {
   return (
     <>
       <p className="eyebrow">Apple Health · Aura iOS app</p><h2>Link your real Apple Health data</h2>
-      <p>The Aura app reads Apple Health on your iPhone and sends daily totals only to this session: sleep hours, exercise minutes and period dates. You choose which in the app.</p>
+      <p>The Aura app reads Apple Health on your iPhone. It sends the types you select: daily sleep and movement totals, period dates, and timestamped HRV SDNN with workout and mindful-session intervals.</p>
       {l.status === 'starting' ? <p className="soft" role="status">Preparing a link…</p> : null}
       {l.status === 'waiting' ? (
         <>
@@ -195,7 +181,7 @@ function HealthLinkSheet() {
       ) : null}
       {l.status === 'expired' ? <><p role="alert">This link has expired.</p><Btn act="health-link">Make a new link</Btn></> : null}
       {l.status === 'error' ? <><p role="alert">Couldn’t create a link. Check your connection.</p><Btn act="health-link">Try again</Btn></> : null}
-      <p className="soft">No iPhone or no Aura app? Use an export.xml, or keep using simulated data.</p>
+      <p className="soft">No iPhone or no Aura app? Use an export.xml, or explore the separate Demo mode.</p>
       <Btn act="close" cls="text">Cancel</Btn>
     </>
   );
@@ -205,7 +191,7 @@ function HealthLinkSheet() {
 function PreviewSheet() {
   const d = ui.draft!, t = topic(d.topicId);
   const f = d.fromFactor || '';
-  const group = f.startsWith('movement') ? 'movement' : f === 'short-sleep' ? 'sleep' : f.startsWith('caffeine') ? 'alertness' : (CONCERNS[(S().profile.concerns || [])[0]] || {}).group || 'energy';
+  const group = f.startsWith('movement') ? 'movement' : f === 'short-sleep' ? 'sleep' : f.startsWith('caffeine') ? 'alertness' : userGoals(S())[0]?.group || 'energy';
   const nDays = (String(d.days).match(/\d+/) || ['7'])[0];
   const when = [
     ['Today', `Keep your usual ${t.name.toLowerCase()} check-in.`],
@@ -230,7 +216,8 @@ function AcceptSheet() {
   const active = activeObservations(S());
   const target = ui.m.target || (active.find(o => o.topicId === d.topicId)?.id || `new:${d.topicId}`);
   ui.m.target = target;
-  const opts = [...active.map(o => [o.id, topic(o.topicId).name]), ...TOPIC_IDS.filter(id => !active.some(o => o.topicId === id)).map(id => [`new:${id}`, `Start observing: ${topic(id).name}`])];
+  const opts = active.filter(o => o.topicId === d.topicId).map(o => [o.id,topic(o.topicId).name]);
+  if (!opts.length) return <><h2>Add this check-in first</h2><p>This step belongs to {topic(d.topicId).name.toLowerCase()}. Adding it requires your confirmation.</p><Btn act="checkin-topic" val={d.topicId}>Add this check-in</Btn><Btn act="close" cls="text">Keep as a suggestion</Btn></>;
   const tid = target.startsWith('new:') ? target.slice(4) : observation(S(), target)!.topicId;
   const t = topic(tid);
   const observe = d.kind === 'observe';
@@ -238,11 +225,11 @@ function AcceptSheet() {
     <>
       <p className="eyebrow">{observe ? 'Observe only' : 'Accept a small step'}</p><h2>{observe ? 'Keep noticing, no change.' : 'Make the next step clear.'}</h2>
       <label className="inputlabel">Linked observation<select id="plan-obs" value={target} onChange={e => dispatch('plan-obs', undefined, { value: e.target.value })}>{opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      {observe ? <p className="soft">No routine change. You will only answer your check-in.</p> : <label className="inputlabel">What you will do<textarea id="plan-step" defaultValue={d.step} /></label>}
+      {observe ? <p className="soft">No routine change. You will only answer your check-in.</p> : <label className="inputlabel">What you will do<textarea id="plan-step" defaultValue={d.step} readOnly /><small>Recording actions use the reviewed wording. Adjust timing below.</small></label>}
       <label className="inputlabel">Start date<input id="plan-start" type="date" defaultValue={today()} /></label>
       <label className="inputlabel">Review date<input id="plan-review" type="date" defaultValue={addDays(today(), d.fromFactor ? 3 : 6)} /></label>
       <div className="callout">You will answer: “{t.question}”<br />{observe ? 'Feelings only, no execution log.' : 'Each feedback: what you did, this answer, and anything that got in the way.'}<br />A review date does not guarantee enough records to compare.</div>
-      <Btn act="confirm-plan">{observe ? 'Start observing' : 'Confirm and start'}</Btn><Btn act="close" cls="text">Keep as a suggestion</Btn>
+      <Btn act="confirm-plan" disabled={ui.saving}>{ui.saving ? 'Saving…' : observe ? 'Start observing' : 'Confirm and start'}</Btn><Btn act="close" cls="text">Keep as a suggestion</Btn>
       <ErrorLine />
     </>
   );
@@ -264,7 +251,7 @@ function FeedbackSheet() {
           <label className="inputlabel">Other changes or a note<textarea id="fb-note" placeholder="Anything else to keep in context" defaultValue={(d.note as string) || ''} /></label>
         </>
       ) : null}
-      <Btn act="fb-next">{i === 2 ? 'Save feedback' : 'Continue'}</Btn>{i ? <Btn act="fb-back" cls="text">Back</Btn> : null}
+      <Btn act="fb-next" disabled={ui.saving}>{ui.saving ? 'Saving…' : i === 2 ? 'Save feedback' : 'Continue'}</Btn>{i ? <Btn act="fb-back" cls="text">Back</Btn> : null}
       <ErrorLine />
     </>
   );
@@ -280,13 +267,6 @@ function DayCircles({ days, stateOf }: { days: string[]; stateOf: (d: string) =>
     })}</ol>
   );
 }
-const ChoiceCards = ({ q, hint, children }: { q: string; hint?: string; children: React.ReactNode }) => (
-  <section className="donepanel" aria-label={q}><h2>{q}</h2>{hint ? <p className="donehint">{hint}</p> : null}<div className="choicecards">{children}</div></section>
-);
-const Choice = ({ label, act, val, filled }: { label: string; act: string; val: string; filled: boolean }) => (
-  <button type="button" className="choicecard" onClick={e => dispatch(act, val, {}, e.currentTarget)}><span className={`cc ${filled ? 'fill' : ''}`} aria-hidden="true" /><strong>{label}</strong></button>
-);
-
 function DoneSheet() {
   const s = S();
   const o = observation(s, ui.m.obsId)!, t = topic(o.topicId);
@@ -296,19 +276,16 @@ function DoneSheet() {
   const days = dateRange(addDays(today(), -back), addDays(today(), 4 - back));
   const week = dateRange(addDays(today(), -6), today()).filter(d => dayCheckin(s, o.id, d)).length;
   const plan = currentPlans(s).find(p => p.observationId === o.id && p.status === 'active' && p.start <= today() && today() < p.review && !s.feedbacks.some(f => f.planId === p.id && f.date === today()));
-  const caffeineToday = s.entries.some(e => e.kind === 'caffeine' && e.date === today());
-  let panel;
-  if (plan) panel = <ChoiceCards q="Did you do your step today?" hint={plan.title}><Choice label="Not today" act="done-step" val="no" filled={false} /><Choice label="Yes" act="done-step" val="yes" filled /></ChoiceCards>;
-  else if (!caffeineToday && factorsFor(o.topicId).some(f => f.needs === 'caffeine')) panel = <ChoiceCards q="Any caffeine today?"><Choice label="None" act="close" val="" filled={false} /><Choice label="Yes, add it" act="done-open" val="caffeine" filled /></ChoiceCards>;
-  else panel = <ChoiceCards q="Anything else from today?"><Choice label="Food" act="done-open" val="food" filled={false} /><Choice label="Caffeine" act="done-open" val="caffeine" filled={false} /></ChoiceCards>;
+  useEffect(() => {
+    if (plan) return;
+    const timer = window.setTimeout(() => dispatch('close', undefined, {}), 1800);
+    return () => window.clearTimeout(timer);
+  }, [plan]);
   return (
     <>
-      <div className="donetop"><Raw html={flower(week, 7)} />
-        <h1>{streak >= 2 ? 'Good job!' : 'Nice start!'}</h1>
-        <p className="donesub">{c ? `${t.name} · ${checkinStatus(c, o.topicId)}` : `You checked in on ${t.name.toLowerCase()}.`}</p>
-        <div className="streakcard"><p>{streak ? `${streak} day streak` : 'This week'}</p><DayCircles days={days} stateOf={d => d > today() ? '' : dayCheckin(s, o.id, d) ? 'on' : 'miss'} /></div>
-      </div>
-      {panel}<Btn act="close" cls="text donefinish">Skip & finish</Btn>
+      <div className="cleantop nomark"><h1>{streak >= 2 ? 'Nice, you’re on a roll.' : 'Checked in.'}</h1><p className="cleansub">{c ? `${t.name} · ${checkinStatus(c, o.topicId)}` : t.name}</p></div>
+      <div className="cleandays"><DayCircles days={days} stateOf={d => d > today() ? '' : dayCheckin(s, o.id, d) ? 'on' : 'miss'} /><p>{streak > 1 ? `${streak} days in a row` : `${week} of 7 days this week`}</p></div>
+      {plan ? <div className="cleanfoot"><p className="cleanq">Did you do your step today?<small>{plan.title}</small></p><div className="cleanpair"><Btn act="done-step" val="no" cls="cleanpill ghost">Not today</Btn><Btn act="done-step" val="yes" cls="cleanpill ghost">Yes, I did</Btn></div></div> : <span className="autoclose" aria-hidden="true"><i /></span>}
     </>
   );
 }
@@ -327,7 +304,7 @@ function ReviewSheet() {
   const barriers: Record<string, number> = {};
   fbs.forEach(f => (f.barriers || []).forEach(b => { barriers[b] = (barriers[b] || 0) + 1; }));
   const notes = fbs.filter(f => f.note);
-  const worse = changes.some(f => f.change === 'Worse') || fbs.some(f => (f.barriers || []).includes('Felt unwell'));
+  const worse = !!s.safetyEvents?.some(e => !e.topicId || e.topicId === p.topicId) || changes.some(f => f.change === 'Worse') || fbs.some(f => (f.barriers || []).includes('Felt unwell'));
   const disc = analyze(s, obs, today());
   const mean = scored.length ? Math.round(scored.reduce((a, x) => a + x.c!.score!, 0) / scored.length * 10) / 10 : null;
   const done = fbs.filter(f => f.execution === 'Done').length, partly = fbs.filter(f => f.execution === 'Partly done').length;
@@ -341,32 +318,30 @@ function ReviewSheet() {
       : ratio >= 0.6 ? 'You kept it up on most days.' : ratio >= 0.3 ? 'You fit it in on some days.' : 'It was hard to fit in this time.';
   const topBarrier = Object.entries(barriers).sort((x, y) => y[1] - x[1])[0];
   const feltLine = (changeCounts.length ? ` Your ${t.construct.toLowerCase()} felt mostly ${changeCounts[0][0].toLowerCase()}.` : '') + (topBarrier ? ` ${topBarrier[0]} got in the way${topBarrier[1] > 1 ? ` ${topBarrier[1]} times` : ' once'}.` : '');
-  const decided = p.status === 'stopped' || p.status === 'replaced';
+  const decided = p.status === 'replaced' || (p.status === 'stopped' && !worse);
   const fbState = (d: string) => { const f = fbs.find(x => x.date === d); return f ? (f.execution === 'Done' ? 'on' : f.execution === 'Partly done' ? 'part' : 'miss') : d < today() ? 'miss' : ''; };
   const left = total - dayN;
   return (
     <>
-      <div className="donetop"><Raw html={flower(p.kind === 'observe' ? scored.length : done + partly, Math.min(10, total))} />
+      <div className="cleantop">
+        <span className="cleancheck" aria-hidden="true"><svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 25l9 9 19-20" /></svg></span>
         <h1>{isReview ? 'Step complete' : left > 0 ? `${left} ${left === 1 ? 'day' : 'days'} to go` : 'Last day'}</h1>
-        <p className="donesub">{p.title}</p>
-        <p className="reviewlede">{didLine}{feltLine}</p>
-        {p.kind === 'observe' ? null : <div className="streakcard"><p>{done} of {total} days done</p><DayCircles days={dateRange(p.start, p.review)} stateOf={fbState} />{mean === null ? null : <small className="streakfoot">Average {t.construct.toLowerCase()} {mean.toFixed(1)} / 5</small>}</div>}
+        <p className="cleansub">{p.title}</p>
+        <p className="cleanlede">{didLine}{feltLine}</p>
+        {p.kind === 'observe' ? null : <div className="cleandays"><DayCircles days={dateRange(p.start, p.review)} stateOf={fbState} /><p>{done} of {total} days done{mean === null ? '' : ` · average ${t.construct.toLowerCase()} ${mean.toFixed(1)}/5`}</p></div>}
       </div>
       {isReview && topFind ? (
-        <button type="button" className="reviewfind" onClick={e => topFind.i.step ? dispatch('disc-try', topFind.f.id, { obs: obs.id }, e.currentTarget) : dispatch('goexplore', undefined, { obs: obs.id }, e.currentTarget)}>
-          <span className="eyebrow">From your records</span><strong>{topFind.i.headline}</strong><small>{topFind.i.step ? `Next idea: ${topFind.i.step.title} ›` : 'See in Explore ›'}</small>
+        <button type="button" className="cleanfind" onClick={e => topFind.i.step ? dispatch('disc-try', topFind.f.id, { obs: obs.id }, e.currentTarget) : dispatch('goexplore', undefined, { obs: obs.id }, e.currentTarget)}>
+          <small>From your records</small><span>{topFind.i.headline}</span><em>{topFind.i.step ? `Next idea: ${topFind.i.step.title} ›` : 'See in Explore ›'}</em>
         </button>
       ) : null}
       {worse ? <p className="callout warn">You reported feeling worse or unwell. Consider pausing this step, and talk with a health professional if it continues.</p> : null}
-      {decided ? <p className="soft center">This version is {PLAN_STATUS[p.status].toLowerCase()}. Its records stay in your history.</p> : (
-        <>
-          <ChoiceCards q={isReview ? 'What next?' : 'How’s the step going?'}>
-            <Choice label={isReview ? 'Adjust it' : 'Make it easier'} act="decide" val="adjust" filled={false} /><Choice label="Keep going" act="decide" val="continue" filled />
-          </ChoiceCards>
-          <div className="donelinks"><Btn act="decide" val="observe" cls="quiet">Just observe</Btn><span aria-hidden="true">·</span><Btn act="decide" val="stop" cls="quiet">Stop the step</Btn></div>
-          {isReview ? null : <Btn act="close" cls="text donefinish">Skip & finish</Btn>}
-        </>
-      )}
+      <AIReviewPanel planId={p.id}/>
+      <div className="cleanfoot">{decided ? <><p className="soft center">This version is {PLAN_STATUS[p.status].toLowerCase()}. Its records stay in your history.</p><Btn act="close" cls="cleanpill main">Done</Btn></> : worse ? <><Btn act="decide" val="observe" disabled={ui.saving} cls="cleanpill main">Just observe</Btn><Btn act="decide" val="stop" disabled={ui.saving} cls="cleanpill ghost">Stop the step</Btn></> : isReview ? <>
+        <Btn act="decide" val="continue" disabled={ui.saving} cls="cleanpill main">Keep going</Btn><Btn act="decide" val="adjust" disabled={ui.saving} cls="cleanpill ghost">Adjust the step</Btn>
+        <div className="donelinks"><Btn act="decide" val="observe" disabled={ui.saving} cls="quiet">Just observe</Btn><span>·</span><Btn act="decide" val="stop" disabled={ui.saving} cls="quiet">Stop the step</Btn></div>
+      </> : <><Btn act="close" cls="cleanpill main">Done</Btn><Btn act="decide" val="adjust" disabled={ui.saving} cls="cleanpill ghost">Make it easier</Btn></>}<ErrorLine /></div>
+
       <details className="limits small"><summary>What this can’t tell you</summary><ul className="notes">
         <li>{scored.length < MIN_DAYS ? `Only ${scored.length} scored ${scored.length === 1 ? 'day' : 'days'}; too few for a pattern.` : `${scored.length} scored days is still a small sample.`}</li>
         <li>Scores shift with mood, expectations and timing.</li>
@@ -377,10 +352,25 @@ function ReviewSheet() {
   );
 }
 
+function AIReviewPanel({ planId }: { planId: string }) {
+  const s = S(), p = findPlan(s,planId)!;
+  const saved = s.aiReviews?.filter(r => r.planId === p.id && r.planVersion === p.version).at(-1);
+  const r = ui.reviewResult?.planId === p.id ? ui.reviewResult : saved;
+  const stale = r && (r.inputRevision !== (s.inputRevision || 0) || r.mode !== ui.mode);
+  return <section className="aireview" aria-label="Review with Aura">
+    <h3>Review with Aura</h3>
+    {ui.reviewStatus === 'loading' ? <p role="status" className="soft">Reviewing your saved feedback and records…</p> : null}
+    {ui.reviewStatus === 'not-integrated' ? <p role="status">Day 10 AI review is awaiting backend integration. Your feedback is saved; no review or adjustment has been generated.</p> : null}
+    {ui.reviewStatus === 'error' ? <p role="alert">{ui.reviewError} Your feedback is kept.</p> : null}
+    {r ? <><p className="airsummary">{r.summary}</p><small>{r.via === 'gemini' ? `Gemini · ${r.model}` : 'Safety response · not AI'}{stale ? ' · Earlier records: review again before confirming' : ''}</small><details><summary>Why</summary><ul>{r.reasons.map((reason,i) => <li key={i}>{reason}</li>)}</ul></details>{r.proposal ? <article className="stepcard suggestion"><h3>{r.proposal.title}</h3><p>{r.proposal.step}</p>{!stale && !r.safety.pause ? <Btn act="review-accept" cls="pillbtn">Accept the adjustment</Btn> : null}</article> : <p>Suggested next step: {r.recommendation === 'continue' ? 'keep the current step' : r.recommendation === 'observe' ? 'just observe' : 'stop the step'}.</p>}{r.safety.pause ? <p className="callout warn">{r.safety.message}</p> : null}</> : null}
+    <Btn act="review-ai" disabled={ui.reviewStatus === 'loading' || ui.saving} cls="pillbtn">{ui.reviewStatus === 'error' ? 'Try again' : r ? 'Review again' : 'Review with Aura'}</Btn>
+  </section>;
+}
+
 // ---------- settings & info ----------
 function SettingsSheet() {
   const s = S();
-  const goals = (s.profile.concerns || []).map(c => CONCERNS[c]).filter(Boolean);
+  const goals = userGoals(s);
   const obs = activeObservations(s);
   const row = (label: string, value: string, act: string, v?: string, data?: Record<string, string>, cls = '') => (
     <li key={label}><button type="button" className={`setrow ${cls}`} onClick={e => dispatch(act, v, data || {}, e.currentTarget)}><span>{label}</span>{value ? <b>{value}</b> : null}<i aria-hidden="true">›</i></button></li>
@@ -388,13 +378,16 @@ function SettingsSheet() {
   return (
     <>
       <h2 className="setttitle">Your settings</h2>
-      <div className="setlabel"><span>Your goals</span><Btn act="resetup" cls="quiet" label="Edit goals">Edit</Btn></div>
-      {goals.length ? <div className="goalcards">{goals.map(g => <div key={g.id} className="goalcard"><Raw html={goalArt(g.group, 64)} /><span>{g.goal}</span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'resetup')}</ul>}
-      <p className="setlabel"><span>Your observations</span></p>
-      <ul className="setlist">{obs.map(o => row(topic(o.topicId).name, o.time, 'open', 'obsedit', { obs: o.id }))}{obs.length < TOPIC_IDS.length ? row('Add an observation', '', 'open', 'addobs', {}, 'add') : null}</ul>
+      <div className="setlabel"><span>Your goals</span><Btn act="open" val="goals" cls="quiet" label="Edit goals">Edit</Btn></div>
+      {goals.length ? <div className="goalcards">{goals.map((g, i) => <div key={g.id} className="goalcard"><Raw html={goalArt(g.group, 64)} /><span>{g.label}{i === 0 ? <small>Priority</small> : null}<small>{goalObservations(s, g.id).map(o => topic(o.topicId).name).join(' · ') || 'No check-in yet'}</small></span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'open', 'goals')}</ul>}
+      <p className="setlabel"><span>Your daily check-ins</span></p>
+      <ul className="setlist">{obs.map(o => row(topic(o.topicId).name, o.time, 'open', 'obsedit', { obs: o.id }))}{obs.length < TOPIC_IDS.length ? row('Add a check-in', '', 'open', 'addobs', {}, 'add') : null}</ul>
       <p className="setlabel"><span>Data</span></p>
       <ul className="setlist">{row('Apple Health', s.dataSource === 'apple-health' && s.healthImport ? (s.healthImport.via === 'simulated' ? 'Simulated' : 'Imported') : 'Off', 'open', 'data')}{row('Sample history', s.dataSource === 'sample' ? 'On' : 'Off', 'open', 'data')}</ul>
       {s.plans.length ? <><p className="setlabel"><span>Your steps</span></p><ul className="setlist">{row('Steps and decisions', String(s.plans.length), 'open', 'history')}</ul></> : null}
+      <p className="setlabel"><span>Practical constraints</span></p><label className="inputlabel">What should a step work around?<input id="profile-constraint" defaultValue={s.profile.constraint}/></label><Btn act="profile-save" cls="quiet">Save constraints</Btn>
+      <label className="permission"><span>Allow relevant period dates in Aura’s context</span><input type="checkbox" checked={s.profile.includeCycleContext === true} onChange={e => dispatch('cycle-context',undefined,{checked:e.target.checked ? '1' : ''})}/></label>
+      {ui.mode === 'demo' ? <label className="permission"><span>Allow labeled demo records to be sent to Gemini</span><input type="checkbox" checked={s.profile.includeDemoInAI === true} onChange={e => dispatch('demo-ai-consent',undefined,{checked:e.target.checked ? '1' : ''})}/></label> : null}
       <p className="setlabel"><span>Privacy</span></p>
       <ul className="setlist">
         <li><div className="setrow"><span>Share anonymous usage data</span><Switch act="share-toggle" on={!!(s.profile.consent && s.profile.consent.share)} label="Share anonymous usage data" /></div></li>
@@ -410,11 +403,36 @@ function ObsEditSheet() {
   const o = observation(S(), ui.m.obsId)!, t = topic(o.topicId);
   return (
     <>
-      <p className="eyebrow">Observation</p><h2>{t.name}</h2><p>“{t.question}”</p>
+      <p className="eyebrow">Daily check-in</p><h2>{t.name}</h2><p>“{t.question}”</p>
       <label className="inputlabel">Check-in time <small>{t.timing.label}</small><input id="obsedit-time" type="time" defaultValue={o.time} /></label>
-      <Btn act="save-obsedit">Save</Btn>{activeObservations(S()).length > 1 ? <Btn act="pause-obs" cls="text danger">Stop observing this</Btn> : null}
+      <GoalFit topicId={o.topicId} />
+      <Btn act="save-obsedit">Save</Btn>{activeObservations(S()).length > 1 ? <Btn act="pause-obs" cls="text danger">Pause this check-in</Btn> : null}
       <ErrorLine />
-      <p className="soft">Stopping keeps your records.</p>
+      <p className="soft">Pausing keeps your records.</p>
+    </>
+  );
+}
+
+// ---------- edit goals ----------
+// Add, remove or prioritise goals directly. Check-ins and records are never changed here;
+// a goal with no suitable check-in offers to add one.
+function GoalsSheet() {
+  const s = S(), mine = s.profile.goals || [];
+  return (
+    <>
+      <p className="eyebrow">Your goals</p><h2>What do you want to improve?</h2><p>Removing a goal keeps your check-ins and records.</p>
+      {CONCERN_GROUPS.map(grp => <section key={grp.id}><p className="setlabel"><span>{grp.label}</span></p>
+        <ul className="setlist">{grp.items.map(c => {
+          const g = GOAL_CATALOG[c.id], on = mine.includes(g.id), tracked = goalObservations(s, g.id);
+          return <li key={g.id}>
+            <div className="setrow"><span>{g.label}<small>{g.problem}</small></span><Switch act="goal-toggle" on={on} label={`Goal: ${g.label}`} v={g.id} /></div>
+            {on ? <div className="goalfit">
+              {mine[0] === g.id ? <b>Priority</b> : <Btn act="goal-priority" val={g.id} cls="quiet">Make priority</Btn>}
+              {tracked.length ? <small>Tracked by {tracked.map(o => topic(o.topicId).name).join(', ')}</small> : <Btn act="open" val="addobs" data={{ topic: g.topics[0] }} cls="quiet">Add a {topic(g.topics[0]).name.toLowerCase()} check-in</Btn>}
+            </div> : null}
+          </li>;
+        })}</ul></section>)}
+      <ErrorLine />
     </>
   );
 }
@@ -422,7 +440,7 @@ function ObsEditSheet() {
 // Placeholder legal copy for the prototype; final text comes from legal review.
 const LEGAL: Record<string, [string, string[]]> = {
   terms: ['Terms of Service', ['Aura helps you notice patterns in your own records. It does not give medical advice, diagnose or treat any condition.', 'You are responsible for what you choose to record and for decisions you make with it.', 'You can delete all your records at any time from Settings › About this prototype.']],
-  privacy: ['Privacy Policy', ['Your check-ins, notes and photos are stored for this browser session in Google Cloud, separate from every other visitor. Nobody else can open them.', 'When you talk with Aura or add a food photo, the relevant records or the photo are sent to Google Gemini (Vertex AI) to write a reply or suggest fields. They are not used to train models.', 'Apple Health data is read only from an export file you choose (or the Aura iOS app), and only daily totals of the types you allow are saved.', 'Anonymous usage data is shared only if you turn it on, and never includes your records.']],
+  privacy: ['Privacy Policy', ['Your check-ins, notes and photos are stored for this browser session in Google Cloud, separate from every other visitor. Nobody else can open them.', 'When you talk with Aura or add a food photo, the relevant records or the photo are sent to Google Gemini (Vertex AI) to write a reply or suggest fields. They are not used to train models.', 'Apple Health data is read only from an export file you choose (or the Aura iOS app), and only the types you allow are saved, including timestamped HRV when selected.', 'Anonymous usage data is shared only if you turn it on, and never includes your records.']],
   health: ['Using your data', ['Aura uses your check-ins and, if you connect it, sleep, exercise minutes and period dates.', 'They are used to show your records, charts and Discovery comparisons, and as context for Aura’s replies.', 'You can stop sharing any type, or remove imported data, in Settings › Data.']]
 };
 function LegalSheet() {
@@ -448,19 +466,21 @@ function HistorySheet() {
 }
 
 function AboutSheet() {
-  return (
-    <>
-      <h2>Aura.ai</h2><p>Understand how you live.</p>
-      <div className="callout">
-        {ui.ai.enabled
-          ? <>Aura’s replies and photo suggestions come from Google Gemini ({ui.ai.model}). Numbers are computed by the app and every reply is checked against them before it’s shown. Safety checks run before and after each reply.</>
-          : <>AI is not configured in this environment, so Aura’s replies are preset and photos are not read automatically.</>}
-        {' '}Sample data is fictional and labeled. Apple Health data comes only from an export file you choose, or is simulated and labeled.
-      </div>
-      <p className="soft">Your records are saved for this browser session, apart from every other visitor. {ui.saveError ? `Last save failed: ${ui.saveError}` : ''}</p>
-      <Btn act="open" val="demo" cls="smallaction">Demo timeline (day 1 · 4 · 10)</Btn><Btn act="resetup" cls="smallaction">Edit setup</Btn><Btn act="reset" cls="text danger">Delete all records and restart</Btn>
-    </>
-  );
+  const s=S(), demo=ui.mode==='demo';
+  const data=demo ? 'Demo records are fictional' : s.dataSource==='apple-health' && s.healthImport?.via!=='simulated' ? 'Your records · Apple Health imported' : 'Your confirmed records';
+  return <>
+    <p className="eyebrow">Prototype</p><h2>Aura.ai</h2><p className="abouttag">Understand how you live.</p>
+    <ul className="aboutfacts">
+      <li><b>Replies</b><span>{ui.ai.enabled ? 'Gemini · based on your records' : 'AI unavailable · messages are saved'}</span></li>
+      <li><b>Data</b><span>{data}</span></li>
+      <li><b>Saved</b><span>{ui.saveError ? `Not saved: ${ui.saveError}` : 'Your browser session · server storage'}</span></li>
+    </ul>
+    <ul className="setlist">
+      <li><button type="button" className="setrow" onClick={e=>dispatch('open','demo',{},e.currentTarget)}><span>Demo timeline</span>{demo && s.demo ? <b>Day {s.demo.day}</b>:null}<i aria-hidden="true">›</i></button></li>
+      <li><button type="button" className="setrow" onClick={e=>dispatch('resetup',undefined,{},e.currentTarget)}><span>Edit setup</span><i aria-hidden="true">›</i></button></li>
+    </ul>
+    <div className="aboutfoot"><Btn act="reset" cls="text danger">{demo ? 'Reset demo' : 'Delete all records'}</Btn></div><ErrorLine />
+  </>;
 }
 
 function DemoSheet() {
@@ -468,17 +488,22 @@ function DemoSheet() {
   return (
     <>
       <p className="eyebrow">Demo timeline · for review</p><h2>See Aura over a week</h2>
-      <p>Each option back-dates realistic records so you can see what changes as days pass. It replaces the records in this session only.</p>
+      <p>Personal records are kept separately. Switching days rebuilds the demo case; additions to the current demo are replaced after confirmation.</p>
       <div className="options">{SCENARIOS.map(s => <Option key={s.day} text={s.title} on={!!cur && cur.day === s.day} act="demo-load" val={String(s.day)} sub={s.desc} />)}</div>
+      {ui.mode === 'demo' ? <Btn act="demo-personal" cls="text">Return to my records</Btn> : null}
       <ErrorLine />
     </>
   );
 }
 
+function ChatCheckinSheet() {
+ const observations=activeObservations(S());
+ return <><h2>What would you like to check in on?</h2><div className="pillstack">{observations.map(o=><Btn key={o.id} act="open" val="checkin" data={{obs:o.id}} cls="pillopt">{topic(o.topicId).name}</Btn>)}</div>{observations.length<TOPIC_IDS.length ? <Btn act="open" val="addobs" cls="quiet">Add a check-in</Btn>:null}</>;
+}
 const SHEETS: Record<string, [string, () => React.ReactNode]> = {
-  checkin: ['Check-in', CheckinSheet], food: ['Food', FoodSheet], caffeine: ['Caffeine', CaffeineSheet], addobs: ['Add observation', AddObsSheet],
-  demo: ['Demo timeline', DemoSheet], settings: ['Settings', SettingsSheet], legal: ['Terms and privacy', LegalSheet], obsedit: ['Observation', ObsEditSheet],
-  data: ['Data sources', DataSheet], healthperm: ['Health permission', HealthPermSheet], healthlink: ['Link Apple Health', HealthLinkSheet], preview: ['Suggested step', PreviewSheet], accept: ['Accept step', AcceptSheet],
+  chatcheckin: ['Choose a check-in', ChatCheckinSheet], checkin: ['Check-in', CheckinSheet], food: ['Food', FoodSheet], caffeine: ['Caffeine', CaffeineSheet], addobs: ['Add check-in', AddObsSheet], goals: ['Edit goals', GoalsSheet],
+  demo: ['Demo timeline', DemoSheet], settings: ['Settings', SettingsSheet], legal: ['Terms and privacy', LegalSheet], obsedit: ['Daily check-in', ObsEditSheet],
+  data: ['Health data', DataSheet], healthperm: ['Health data', DataSheet], healthlink: ['Link Apple Health', HealthLinkSheet], preview: ['Suggested step', PreviewSheet], accept: ['Accept step', AcceptSheet],
   feedback: ['Step feedback', FeedbackSheet], review: ['Review', ReviewSheet], done: ['Check-in saved', DoneSheet], history: ['History', HistorySheet], about: ['About', AboutSheet]
 };
 
@@ -497,8 +522,8 @@ export function Modal() {
   };
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) dispatch('backdrop', undefined, {}); }}>
-      <section ref={ref} key={ui.modalSeq} className={`sheet ${['review', 'settings', 'done'].includes(m) ? 'fullsheet' : ''}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={onKey}>
-        <Btn act="close" cls="close" label="Close">×</Btn>
+      <section ref={ref} key={ui.modalSeq} className={`sheet ${['review', 'settings', 'done'].includes(m) ? 'fullsheet' : ''}${['done', 'review'].includes(m) ? ' cleansheet' : ''}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={onKey}>
+        <Btn act="close" cls="close" label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></Btn>
         <Body />
       </section>
     </div>

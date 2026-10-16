@@ -1,5 +1,7 @@
 # Aura.ai web demo
 
+For the v2 integration, preview steps and unresolved decisions, see [Aura v2 integration](docs/aura-v2-integration.md).
+
 A working version of the Aura.ai prototype (Ellie's design, kept in `prototype-ref/` for reference): Next.js on Cloud Run, Gemini on Vertex AI, Firestore and Cloud Storage. It looks and flows like the prototype; the parts that were faked are now real.
 
 | Prototype | This app |
@@ -8,17 +10,18 @@ A working version of the Aura.ai prototype (Ellie's design, kept in `prototype-r
 | Tapping a sample photo pre-filled fields | Gemini reads the actual photo (sample or your own) and proposes name, note and "caffeinated?"; you confirm before anything is saved |
 | Records in localStorage | Records saved per anonymous visitor session (Firestore); photos in Cloud Storage; reset affects only you |
 | No safety layer | Rules + Gemini classifier before every reply, output check after (PRD §7.3) |
-| Simulated Apple Health | Still available (labeled "simulated"), plus real data: link the Aura iOS app (opt-in, from any browser) or import `export.xml` in the browser |
+| Simulated Apple Health | Fictional history is available in a separate, labeled Demo mode. Personal data uses real sources: link the Aura iOS app (opt-in, from any browser) or import `export.xml` in the browser |
 
 ## Run locally
 
 ```bash
 cd web
-npm install
-npm run dev
+node --version # Node.js 22 or newer
+npm ci
+STORAGE=file GEMINI_DISABLED=1 npm run dev
 ```
 
-Open http://localhost:3000. Without `GOOGLE_CLOUD_PROJECT` the app runs fully offline: records go to `web/.data/`, Aura uses the prototype's preset replies (labeled "Preset reply"), and photos aren't read automatically.
+Open http://localhost:3000. Without `GOOGLE_CLOUD_PROJECT` the app runs fully offline: records go to `web/.data/`, Aura shows verified summaries and an explicit unavailable-AI state, and photos aren't read automatically.
 
 To use Gemini locally, set `GOOGLE_CLOUD_PROJECT` (and optionally `GEMINI_MODEL`) in `web/.env.local`, then authenticate once:
 
@@ -78,7 +81,7 @@ Model notes (October 2026): `gemini-3.8-flash` is GA and works (`GEMINI_MODEL=ge
 
 ```
 src/domain/   Pure TypeScript shared by browser and server (ported from the prototype)
-  topics.ts     the three observation topics, concerns, ranking
+  topics.ts     the five observation topics, concerns, ranking
   state.ts      records: observations, check-ins, entries, plans, feedback
   health.ts     sample data, export.xml streaming parser, daily() accessor
   discovery.ts  descriptive comparisons (MIN_DAYS 4, MIN_GROUP 2, gap ≥ 0.5)
@@ -93,7 +96,7 @@ src/server/
   vision.ts     food photo → fields to confirm
   healthLink.ts one-time Apple Health link tokens and the iOS app's payload
 src/app/api/   session (GET/PUT/DELETE), aura (POST), photo (POST, GET /[id]),
-               health/link (POST, GET /[token]), health/sync (POST, iOS app), health/import (DELETE)
+               health/link (POST, GET /[token]), health/sync (POST, iOS app), health/import (DELETE), command (POST), review (POST)
 src/app/link/  /link/<token>: opened from the QR code; hands off to the iOS app
 src/ui/        React port of the prototype's screens; CSS reused verbatim
 ```
@@ -134,12 +137,14 @@ Optional env: `PUBLIC_URL` (origin used in links, if the proxy headers are wrong
 
 - Sessions are isolated by cookie. Photos are served only to the session that uploaded them.
 - "Delete all records and restart" removes this session's document and photos.
-- Apple Health `export.xml` is parsed in the browser; the iOS app computes totals on the phone. Only daily totals are saved.
+- Apple Health `export.xml` is parsed in the browser; the iOS app computes totals on the phone. Daily totals and selected timestamped HRV/workout/mindful records are saved.
 - Each session gets a Gemini call budget (`AI_CALLS_PER_HOUR`).
 
 ## Known limits
 
-- Real Apple Health needs the iOS app on the visitor's iPhone (TestFlight or the presenter's phone; App Clips can't use HealthKit). Others use `export.xml` or simulated data. A link sends a one-time snapshot; there's no background resync yet.
+- Real Apple Health needs the iOS app on the visitor's iPhone (TestFlight or the presenter's phone; App Clips can't use HealthKit). Others use `export.xml` or the separate Demo mode. A link sends a one-time snapshot; there's no background resync yet.
 - The grounding check verifies numbers, citations, steps and banned wording; it can't catch every semantic error in free text.
 - The safety rules and copy follow the PRD draft and still need the content review named in PRD §7.3.
 - The demo uses the name "Alex" and fictional records throughout.
+
+Agent backend ownership and contracts: [Rudy handoff](docs/agent-integration-handoff.md). The existing Agent is preserved; the new Day 10 generator is pending even when chat Gemini is configured.

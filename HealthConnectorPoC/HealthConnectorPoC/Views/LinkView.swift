@@ -24,8 +24,8 @@ struct LinkView: View {
                             VStack(alignment: .leading) { Text(k.title); Text(k.detail).font(.caption).foregroundStyle(.secondary) }
                         }
                     }
-                } header: { Text("Share daily totals, last \(AuraLink.days) days") } footer: {
-                    Text("Only daily totals are sent. Individual samples, times of day, heart rate, sources and other health data stay on this iPhone. This link works once.")
+                } header: { Text("Choose data, last \(AuraLink.days) days") } footer: {
+                    Text("Sleep, exercise and period dates are daily totals. If you select HRV, timestamped SDNN samples plus workout and mindful-session intervals are also sent read-only. This link works once; return to the browser to see your records.")
                 }
                 Section { content }
             }

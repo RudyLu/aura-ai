@@ -1,14 +1,16 @@
 'use client';
 // Explore and Discovery (ported from views.js explore()/discoveryDetail() and chart.js overlay()).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { addDays, dateRange, fmtDate, fmtDay } from '@/domain/dates';
-import { analyze, findings, insight, type FactorResult } from '@/domain/discovery';
+import { analyze, findings, insight, type FactorResult } from '@/domain/uiDiscovery';
 import { daily, sourceLabel } from '@/domain/health';
 import { activeObservations, dayCheckin, type Checkin, type Entry, type Observation } from '@/domain/state';
 import { topic, TOPIC_IDS } from '@/domain/topics';
 import { Btn, checkinStatus, plural, SourceTag } from './core';
 import { dispatch } from './actions';
-import { dayRecords } from './today';
+import { HRVCard } from './hrv';
+import { refreshLinkedHealth } from './store';
+import { TOPIC_HUES, OriginTag, dayRecords } from './today';
 import { S, today, ui } from './store';
 
 const FACTOR_COPY = { insufficient: 'Not enough days', 'no-difference': 'No clear difference', difference: 'Difference in your records' };
@@ -68,7 +70,7 @@ function BestDayHero({ obs }: { obs: Observation }) {
   const food = s.entries.filter(e => e.date === bd && e.kind === 'food' && (e.source !== 'sample' || withSample));
   const tags = [
     h.sleep !== null ? ['sleep', `Sleep ${h.sleep} h`] : null,
-    ['caffeine', drinks.length ? `Caffeine ×${drinks.length}${before.length ? ' · last ' + before.at(-1)!.occurredAt.slice(11, 16) : ''}` : 'No caffeine'],
+    ['caffeine', drinks.length ? `Caffeine ×${drinks.length}${before.length ? ' · last ' + before.at(-1)!.occurredAt.slice(11, 16) : ''}` : 'No caffeine logged'],
     h.activity !== null ? ['move', h.activity ? `Movement ${h.activity} min` : 'No exercise'] : null,
     food.length ? ['food', food.map(f => f.name).join(', ')] : null,
     h.cycle ? ['cycle', 'Period day'] : null
@@ -94,6 +96,7 @@ function BestDayHero({ obs }: { obs: Observation }) {
 }
 
 function DiscoveryDetail({ obs }: { obs: Observation }) {
+  if (['stress','productivity'].includes(obs.topicId)) return <div className="finding"><h3>Your recorded context</h3><p>Feelings, notes and plan reviews are available. Factor comparisons are not configured for {topic(obs.topicId).name.toLowerCase()}.</p></div>;
   const s = S();
   const { r, have, need, caffeineDays, sleepOn } = readiness(obs);
   const t = topic(obs.topicId);
@@ -125,7 +128,7 @@ function DiscoveryDetail({ obs }: { obs: Observation }) {
           <article className="finding"><p className="eyebrow">What your records show</p><h3>{top.i.headline}</h3>{bars(top.f)}
             {top.i.step
               ? <div className="tryit"><p className="eyebrow">Something small to try</p><strong>{top.i.step.title}</strong><p>{top.i.step.desc}</p><Btn act="disc-try" val={top.f.id} data={{ obs: obs.id }}>Try it</Btn></div>
-              : <p className="soft">Nothing to change yet. Keep checking in.</p>}
+              : <p className="soft">Lifestyle suggestions await review. You can continue recording or observing.</p>}
           </article>
         ) : (
           <article className="finding"><p className="eyebrow">What your records show</p><h3>No clear differences yet</h3><p className="soft">Your {t.name.toLowerCase()} looks similar across the days compared. More days will make this clearer.</p></article>
@@ -140,7 +143,7 @@ function DiscoveryDetail({ obs }: { obs: Observation }) {
             );
           })}</ul></details>
         ) : null}
-        <p className="soft findnote">Based on {plural(r.validDays, 'day')} with a check-in. Averages show what went together, not what caused it. A small step is how you find out.{r.usedSample ? ' Includes sample records.' : ''}</p></>
+        <p className="soft findnote">Based on {plural(r.validDays, 'day')} with a check-in. Averages show what went together, not what caused it. These comparisons do not test an intervention.{r.usedSample ? ' Includes sample records.' : ''}</p></>
     );
   }
   return (
@@ -158,7 +161,16 @@ function Overlay({ dates, series, selected, focus, selectedLabel }: { dates: str
   const x = (i: number) => 12 + (n === 1 ? 0 : i * 336 / (n - 1));
   const half = n === 1 ? 168 : 168 / (n - 1);
   const ref = useRef<SVGSVGElement>(null);
-  useEffect(() => { if (!ui.chartPlayed && ref.current) { ref.current.classList.add('chart-enter'); ui.chartPlayed = true; } }, []);
+  useEffect(() => {
+    const plot=ref.current;
+    if (!plot || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const show=()=>{plot.classList.remove('chart-wait');plot.classList.add('chart-enter');};
+    if (!('IntersectionObserver' in window)) {show();return;}
+    plot.classList.add('chart-wait');
+    const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting && e.intersectionRatio>=.35)){show();observer.disconnect();}},{threshold:[0,.35,.6]});
+    observer.observe(plot);
+    return ()=>{observer.disconnect();plot.classList.remove('chart-wait','chart-enter');};
+  }, []);
   const band = (t: Series) => {
     const on = focus === 'all' || focus === t.key;
     return (
@@ -207,7 +219,7 @@ export function RecordRow({ kind, r }: { kind: 'checkin' | 'entry'; r: Checkin |
   if (kind === 'checkin') {
     const c = r as Checkin, tt = topic(c.topicId);
     return (
-      <article className="recordrow"><div><strong>{tt.name}</strong><small>{timeOf(c.occurredAt)} · {checkinStatus(c, c.topicId)} <SourceTag source={c.source} />{c.editedAt ? <> <span className="badge">Edited</span></> : null}</small>{c.note ? <p>{c.note}</p> : null}</div>
+      <article className="recordrow"><div><strong>{tt.name}</strong><small>{timeOf(c.occurredAt)} · {checkinStatus(c, c.topicId)} <SourceTag source={c.source} /><OriginTag origin={c.origin}/>{c.editedAt ? <> <span className="badge">Edited</span></> : null}</small>{c.note ? <p>{c.note}</p> : null}</div>
         {editable ? <Btn act="open" val="checkin" data={{ obs: c.observationId, rec: c.id }} cls="quiet" label={`Edit ${tt.name} check-in at ${timeOf(c.occurredAt)}`}>Edit</Btn> : null}</article>
     );
   }
@@ -215,7 +227,7 @@ export function RecordRow({ kind, r }: { kind: 'checkin' | 'entry'; r: Checkin |
   const extra = e.kind === 'caffeine' && e.mg !== null && e.mg !== undefined ? ` · ${e.mg} mg` : '';
   return (
     <article className="recordrow">{e.photoUrl ? <img src={e.photoUrl} alt={`Photo for ${e.name}`} /> : null}
-      <div><strong>{e.name}</strong><small>{timeOf(e.occurredAt)} · {e.kind === 'caffeine' ? 'Caffeine' : 'Food'}{extra} <SourceTag source={e.source} />{e.extracted ? <> <span className="badge">From photo · confirmed</span></> : null}{e.editedAt ? <> <span className="badge">Edited</span></> : null}</small>{e.size || e.note ? <p>{[e.size, e.note].filter(Boolean).join(' · ')}</p> : null}</div>
+      <div><strong>{e.name}</strong><small>{timeOf(e.occurredAt)} · {e.kind === 'caffeine' ? 'Caffeine' : 'Food'}{extra} <SourceTag source={e.source} /><OriginTag origin={e.origin}/>{e.extracted ? <> <span className="badge">From photo · confirmed</span></> : null}{e.editedAt ? <> <span className="badge">Edited</span></> : null}</small>{e.size || e.note ? <p>{[e.size, e.note].filter(Boolean).join(' · ')}</p> : null}</div>
       {editable ? <Btn act="open" val={e.kind} data={{ rec: e.id }} cls="quiet" label={`Edit ${e.name}`}>Edit</Btn> : null}</article>
   );
 }
@@ -239,15 +251,12 @@ export function Explore() {
   const focus = ui.explore.metric || 'all';
   const ov: Series[] = [];
   let dayChk: Checkin | null = null;
-  if (o && t) {
-    const chk = dates.map(d => dayCheckin(s, o.id, d, { includeSample: withSample }));
-    dayChk = chk[sel];
-    ov.push({
-      key: 'feeling', label: t.name, color: '#ffba79', unit: `1–5, ${t.higherIsBetter ? 'higher = more' : 'higher = sleepier'}`, scale: 5,
-      ticks: [{ v: 1, label: `1 ${t.labels[0]}` }, { v: 3, label: `3 ${t.labels[2]}` }, { v: 5, label: `5 ${t.labels[4]}` }],
-      values: chk.map(c => c && c.status === 'recorded' ? c.score : null), marks: chk.map(c => c && c.status !== 'recorded' ? c.status : null),
-      reading: checkinStatus(dayChk, o.topicId) || 'No check-in', source: dayChk ? (dayChk.source === 'sample' ? 'Sample' : 'Your check-in') : ''
-    });
+  if (o) dayChk = dayCheckin(s, o.id, day, { includeSample: withSample });
+  for (const observed of obs) {
+    const tt = topic(observed.topicId), chk = dates.map(d => dayCheckin(s, observed.id, d, { includeSample: withSample }));
+    const dc = chk[sel];
+    ov.push({ key: `obs-${observed.id}`, label: tt.name, color: TOPIC_HUES[observed.topicId], unit: tt.direction, scale: 5,
+      ticks: [{v:1,label:tt.labels[0]},{v:3,label:tt.labels[2]},{v:5,label:tt.labels[4]}], values: chk.map(c => c?.status === 'recorded' ? c.score : null), marks: chk.map(c => c && c.status !== 'recorded' ? c.status : null), reading: checkinStatus(dc,observed.topicId) || 'No check-in', source: dc?.source === 'sample' ? 'Sample' : 'Your check-in' });
   }
   ov.push({ key: 'sleep', label: 'Sleep', color: '#b49aff', unit: '0–10 hours', scale: 10, ticks: [{ v: 0, label: '0 h' }, { v: 5, label: '5 h' }, { v: 10, label: '10 h' }], values: hd.map(x => x.sleep), reading: dayH.sleep === null ? 'No record' : dayH.sleep + ' h', source: srcName });
   ov.push({ key: 'activity', label: 'Movement', color: '#66cddd', unit: '0–60 minutes', scale: 60, ticks: [{ v: 0, label: '0 min' }, { v: 30, label: '30 min' }, { v: 60, label: '60+ min' }], values: hd.map(x => x.activity === null ? null : Math.min(60, x.activity)), reading: dayH.activity === null ? 'No record' : dayH.activity + ' min', source: srcName });
@@ -259,39 +268,23 @@ export function Explore() {
     if (strip && el) strip.scrollLeft = el.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + el.clientWidth / 2;
   });
   const needCheckin = o && !dayChk && day <= end;
-  return (
-    <main className="explore-full"><div className="pagehead"><h1>Explore</h1></div>
-      <div className="obschips" role="tablist" aria-label="Observation">
-        {obs.map(x => <button key={x.id} type="button" role="tab" aria-selected={x.id === ui.explore.obsId} onClick={e => dispatch('exp-obs', x.id, {}, e.currentTarget)}>{topic(x.topicId).name}</button>)}
-        {obs.length < TOPIC_IDS.length ? <Btn act="open" val="addobs" cls="chipadd" label="Add an observation">＋</Btn> : null}
-      </div>
-      <section className="focuschart layeredchart" aria-label="Timeline">
-        {focusSeries ? <p className="chartintro">{focusSeries.label} · {focusSeries.unit}</p> : null}
-        <div className="overlaytabs" aria-label="Highlight a signal">
-          {[{ key: 'all', label: 'All signals', color: '#fff' }, ...ov].map(x => <button key={x.key} type="button" aria-pressed={focus === x.key} style={{ ['--signal' as string]: x.color }} onClick={e => dispatch('exp-metric', x.key, {}, e.currentTarget)}><i />{x.label}</button>)}
-        </div>
-        <div className="dateaxis overlaydates" ref={datesRef}>
-          {dates.map(d => <button key={d} type="button" className={d === day ? 'selected' : ''} aria-pressed={d === day} aria-label={fmtDay(d)} onClick={e => dispatch('exp-date', d, {}, e.currentTarget)}><small>{new Date(d + 'T12:00').toLocaleDateString('en', { weekday: 'short' })}</small>{d.slice(8)}</button>)}
-        </div>
-        <Overlay dates={dates} series={ov} selected={sel} focus={focus} selectedLabel={day === end ? 'TODAY' : day.slice(5)} />
-        <div className="rangeseg" role="group" aria-label="Days shown">{[7, 14].map(n => <button key={n} type="button" aria-pressed={ui.explore.range === n} onClick={e => dispatch('exp-range-set', String(n), {}, e.currentTarget)}>{n} days</button>)}</div>
-      </section>
-      <section className="chart-details"><p className="readingdate">{fmtDay(day)}{day === end ? ' · Today' : ''}</p>
-        <div className={`signalreadings ${ov.length > 3 ? 'four' : ''}`}>
-          {ov.map(x => <div key={x.key} style={{ ['--signal' as string]: x.color, opacity: focus === 'all' || focus === x.key ? 1 : 0.45 }}><span><i />{x.label}</span><strong>{x.reading}</strong>{x.source === 'Sample' ? <small>Sample</small> : null}</div>)}
-        </div>
-        {needCheckin ? <Btn act="open" val="checkin" data={{ obs: o!.id, date: day }} cls="smallaction wide">{`Check in for ${day === end ? 'today' : fmtDate(day)}`}</Btn> : null}
-        <details className="chartscales"><summary>How to read this</summary><ul className="notes"><li>Each signal has its own scale{o ? `: ${t!.name} 1–5` : ''}, sleep 0–10 h, movement 0–60 min.</li><li>Pink columns are period dates.</li><li>Curves moving together don’t mean they’re related.</li></ul></details>
-      </section>
-      {o ? <section className="discovery" aria-label="Discovery"><DiscoveryDetail obs={o} /></section> : null}
-      {day === end ? null : (
-        <>
-          <div className="sectionlabel" id="records"><h2>{fmtDate(day)} records</h2><Btn act="open" val="caffeine" data={{ date: day }} cls="quiet">＋ Caffeine</Btn></div>
-          <div className="dayevents">{recs.length ? recs.map(x => <RecordRow key={x.r.id} kind={x.kind} r={x.r} />) : <p className="soft">Nothing recorded.</p>}
-            {dayH.cycle ? <article className="recordrow"><div><strong>Period date recorded</strong><small>{srcName} · date only</small></div></article> : null}</div>
-        </>
-      )}
-      <div className="srcrow"><span>Sleep & movement · <b>{srcName}</b></span><Btn act="open" val="data" cls="quiet">Manage</Btn></div>
-    </main>
-  );
+  useEffect(() => { refreshLinkedHealth(); }, []);
+  const feel = ov.filter(x => x.key.startsWith('obs-')), body = ov.filter(x => !x.key.startsWith('obs-'));
+  const tabs = (list: Series[]) => <div className="overlaytabs">{[{key:'all',label:'All signals',color:'#fff'},...list].map(x => <button key={x.key} style={{['--signal' as string]:x.color}} aria-pressed={focus === x.key} onClick={e => dispatch('exp-metric',x.key,{},e.currentTarget)}><i/>{x.label}</button>)}</div>;
+  const readings = (list: Series[]) => <div className="signalreadings">{list.map(x => <div key={x.key} style={{['--signal' as string]:x.color}}><span><i/>{x.label}</span><strong>{x.reading}</strong></div>)}</div>;
+  return <main className="explore-full"><div className="pagehead"><p className="eyebrow">Explore</p><h1>{o ? <>What goes with your <em style={{color:TOPIC_HUES[o.topicId]}}>{t!.construct.toLowerCase()}</em></> : 'Explore'}</h1><p className="pagesub">Your check-ins next to your body, day by day.</p></div>
+    <div className="obschips" role="tablist" aria-label="Observation">{obs.map(x => <button key={x.id} role="tab" aria-selected={x.id === ui.explore.obsId} onClick={e => dispatch('exp-obs',x.id,{},e.currentTarget)}>{topic(x.topicId).name}</button>)}{obs.length < TOPIC_IDS.length ? <Btn act="open" val="addobs" cls="chipadd" label="Add a check-in">＋</Btn> : null}</div>
+    <div className="dateaxis overlaydates" ref={datesRef}>{dates.map(d => <button key={d} className={d === day ? 'selected' : ''} aria-pressed={d === day} aria-label={fmtDay(d)} onClick={e => dispatch('exp-date',d,{},e.currentTarget)}><small>{new Date(d+'T12:00').toLocaleDateString('en',{weekday:'short'})}</small>{d.slice(8)}</button>)}</div>
+    <div className="rangeseg" role="group" aria-label="Days shown">{[7,14].map(n => <button key={n} aria-pressed={n === ui.explore.range} onClick={e => dispatch('exp-range-set',String(n),{},e.currentTarget)}>{n} days</button>)}</div>
+    <section className="chartcard" aria-labelledby="h-feel"><div className="chartcardhead"><h2 id="h-feel">How you felt</h2><small>Your check-ins · 1–5</small></div>{tabs(feel)}
+      <Overlay dates={dates} series={feel} selected={sel} focus={feel.some(x => x.key === focus) ? focus : 'all'} selectedLabel={day === end ? 'TODAY' : day.slice(5)}/>{readings(feel)}
+      {needCheckin ? <Btn act="open" val="checkin" data={{obs:o!.id,date:day}} cls="smallaction wide">{`Check in for ${day === end ? 'today' : fmtDate(day)}`}</Btn> : null}<HRVCard day={day}/>
+    </section>
+    <section className="chartcard bodycard" aria-labelledby="h-body"><div className="chartcardhead"><h2 id="h-body">Your body</h2><small>{srcName} · <Btn act="open" val="data" cls="inlinelink">Manage</Btn></small></div>{tabs(body)}
+      <Overlay dates={dates} series={body} selected={sel} focus={body.some(x => x.key === focus) ? focus : 'all'} selectedLabel={day === end ? 'TODAY' : day.slice(5)}/>{readings(body)}
+      <details className="chartscales"><summary>How to read these</summary><p>Each signal has its own scale. Missing records are gaps. Curves moving together do not establish a relationship.</p></details>
+    </section>
+    {o ? <section className="discovery" aria-label="Findings"><DiscoveryDetail obs={o}/></section> : null}
+    {day !== end ? <><div className="sectionlabel"><h2>{fmtDate(day)} records</h2><Btn act="open" val="caffeine" data={{date:day}} cls="quiet">＋ Caffeine</Btn></div><div className="dayevents">{recs.length ? recs.map(x => <RecordRow key={x.r.id} kind={x.kind} r={x.r}/>) : <p className="soft">Nothing recorded.</p>}</div></> : null}
+  </main>;
 }
