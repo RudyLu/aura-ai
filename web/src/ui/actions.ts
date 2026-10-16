@@ -1,4 +1,5 @@
 import { AuraReplySchema, ReviewSchema } from '@/domain/conversation';
+import { updateGoals } from '@/domain/goals';
 // Interactions (ported from events.js). Every control calls dispatch(action, value, data),
 // mirroring the prototype's data-act / data-val / data-* attributes. The fake parts are
 // replaced: Aura's replies come from /api/aura (Gemini, grounded), food photos from
@@ -462,6 +463,11 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     }
 
     // observations & data
+    case 'save-goals': {
+      try { updateGoals(s, JSON.parse(d.goals || '[]')); }
+      catch (error) { return err(error instanceof Error ? error.message : 'Check your goal selections.'); }
+      save(); close(); toast('Goals saved'); break;
+    }
     case 'share-toggle': s.profile.consent = Object.assign({ terms: true, health: true, share: false }, s.profile.consent, { share: !(s.profile.consent && s.profile.consent.share) }); save(); break;
     case 'save-obsedit': {
       const o = observation(s, ui.m.obsId)!, time = val('obsedit-time');
@@ -484,7 +490,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     case 'goal-remove': {
       s.profile.goals = (s.profile.goals || []).filter(g => g.id !== v);
       s.observations.forEach(o => o.goalIds = (o.goalIds || []).filter(id => id !== v));
-      s.profile.concerns = (s.profile.concerns || []).filter(x => x !== v); save();
+      save();
       toast('Removed the goal. Add it back in Settings.');
       break;
     }

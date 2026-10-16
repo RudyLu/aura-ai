@@ -1,6 +1,7 @@
 'use client';
 // Bottom sheets (ported from sheets.js and demo.js sheet()).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { goalOptions, type GoalSelection } from '@/domain/goals';
 import { addDays, daysBetween, dateRange, fmtDate, fmtDay, localDateTime } from '@/domain/dates';
 import { analyze, factorsFor, findings, MIN_DAYS } from '@/domain/uiDiscovery';
 import { SCENARIOS } from '@/domain/demo';
@@ -367,9 +368,27 @@ function AIReviewPanel({ planId }: { planId: string }) {
 }
 
 // ---------- settings & info ----------
+function GoalsEditSheet() {
+  const s = S(), options = goalOptions(s);
+  const [draft, setDraft] = useState<GoalSelection[]>(() => (s.profile.goals || []).map(g => ({ id: g.id, topicIds: s.observations.filter(o => g.observationIds.includes(o.id)).map(o => o.topicId) })));
+  const ready = draft.every(g => g.topicIds.length > 0 && g.topicIds.every(t => options.find(o => o.id === g.id)?.topicIds.includes(t)));
+  return <>
+    <h2>Edit goals</h2><p>Choose your goals and the observations you want to track for each one.</p>
+    <div className="goaledit-options">{options.map(g => {
+      const selected = draft.find(d => d.id === g.id);
+      return <fieldset className="goaledit-option" key={g.id}>
+        <legend><label><input type="checkbox" checked={!!selected} onChange={e => setDraft(e.target.checked ? [...draft, { id: g.id, topicIds: [] }] : draft.filter(d => d.id !== g.id))} />{g.label}</label></legend>
+        {selected ? <div className="goaledit-observations"><p>Observations for this goal</p>{g.topicIds.map(t => <label key={t}><input type="checkbox" checked={selected.topicIds.includes(t)} onChange={e => setDraft(draft.map(d => d.id !== g.id ? d : { ...d, topicIds: e.target.checked ? [...d.topicIds, t] : d.topicIds.filter(id => id !== t) }))} />{topic(t).name}</label>)}{!selected.topicIds.length ? <small>Choose at least one observation.</small> : null}</div> : null}
+      </fieldset>;
+    })}</div>
+    <p className="soft">Removing a goal keeps your observations and past records. Choosing a stopped observation resumes it.</p>
+    <Btn act="save-goals" data={{ goals: JSON.stringify(draft) }} disabled={!ready || ui.saving}>Save goals</Btn><ErrorLine />
+  </>;
+}
+
 function SettingsSheet() {
   const s = S();
-  const goals = (s.profile.concerns || []).map(c => CONCERNS[c]).filter(Boolean);
+  const goals = (s.profile.goals || []).map(g => ({ id: g.id, goal: g.label, group: CONCERNS[g.id]?.group || 'energy' }));
   const obs = activeObservations(s);
   const row = (label: string, value: string, act: string, v?: string, data?: Record<string, string>, cls = '') => (
     <li key={label}><button type="button" className={`setrow ${cls}`} onClick={e => dispatch(act, v, data || {}, e.currentTarget)}><span>{label}</span>{value ? <b>{value}</b> : null}<i aria-hidden="true">›</i></button></li>
@@ -377,8 +396,8 @@ function SettingsSheet() {
   return (
     <>
       <h2 className="setttitle">Your settings</h2>
-      <div className="setlabel"><span>Your goals</span><Btn act="resetup" cls="quiet" label="Edit goals">Edit</Btn></div>
-      {goals.length ? <div className="goalcards">{goals.map(g => <div key={g.id} className="goalcard"><Raw html={goalArt(g.group, 64)} /><span>{g.goal}</span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'resetup')}</ul>}
+      <div className="setlabel"><span>Your goals</span><Btn act="open" val="goalsedit" cls="quiet" label="Edit goals">Edit</Btn></div>
+      {goals.length ? <div className="goalcards">{goals.map(g => <div key={g.id} className="goalcard"><Raw cls="goalcard-art" html={goalArt(g.group, 64)} /><span className="goalcard-label">{g.goal}</span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'open', 'goalsedit')}</ul>}
       <p className="setlabel"><span>Your observations</span></p>
       <ul className="setlist">{obs.map(o => row(topic(o.topicId).name, o.time, 'open', 'obsedit', { obs: o.id }))}{obs.length < TOPIC_IDS.length ? row('Add an observation', '', 'open', 'addobs', {}, 'add') : null}</ul>
       <p className="setlabel"><span>Data</span></p>
@@ -394,7 +413,7 @@ function SettingsSheet() {
         {row('Terms of Service', '', 'open', 'legal', { doc: 'terms' })}{row('Privacy Policy', '', 'open', 'legal', { doc: 'privacy' })}
       </ul>
       <p className="setlabel"><span>Prototype</span></p>
-      <ul className="setlist">{row('Demo timeline', s.demo ? `Day ${s.demo.day}` : '', 'open', 'demo')}{row('Full setup review', '', 'resetup')}{row('About this prototype', '', 'open', 'about')}</ul>
+      <ul className="setlist">{row('Demo timeline', s.demo ? `Day ${s.demo.day}` : '', 'open', 'demo')}{row('About this prototype', '', 'open', 'about')}</ul>
     </>
   );
 }
@@ -453,7 +472,7 @@ function AboutSheet() {
     </ul>
     <ul className="setlist">
       <li><button type="button" className="setrow" onClick={e=>dispatch('open','demo',{},e.currentTarget)}><span>Demo timeline</span>{demo && s.demo ? <b>Day {s.demo.day}</b>:null}<i aria-hidden="true">›</i></button></li>
-      <li><button type="button" className="setrow" onClick={e=>dispatch('resetup',undefined,{},e.currentTarget)}><span>Edit setup</span><i aria-hidden="true">›</i></button></li>
+      <li><button type="button" className="setrow" onClick={e=>dispatch('open','goalsedit',{},e.currentTarget)}><span>Edit goals</span><i aria-hidden="true">›</i></button></li>
     </ul>
     <div className="aboutfoot"><Btn act="reset" cls="text danger">{demo ? 'Reset demo' : 'Delete all records'}</Btn></div><ErrorLine />
   </>;
@@ -477,6 +496,7 @@ function ChatCheckinSheet() {
  return <><h2>What would you like to check in on?</h2><div className="pillstack">{observations.map(o=><Btn key={o.id} act="open" val="checkin" data={{obs:o.id}} cls="pillopt">{topic(o.topicId).name}</Btn>)}</div>{observations.length<TOPIC_IDS.length ? <Btn act="open" val="addobs" cls="quiet">Add an observation</Btn>:null}</>;
 }
 const SHEETS: Record<string, [string, () => React.ReactNode]> = {
+  goalsedit: ['Edit goals', GoalsEditSheet],
   chatcheckin: ['Choose a check-in', ChatCheckinSheet], checkin: ['Check-in', CheckinSheet], food: ['Food', FoodSheet], caffeine: ['Caffeine', CaffeineSheet], addobs: ['Add observation', AddObsSheet],
   demo: ['Demo timeline', DemoSheet], settings: ['Settings', SettingsSheet], legal: ['Terms and privacy', LegalSheet], obsedit: ['Observation', ObsEditSheet],
   data: ['Health data', DataSheet], healthperm: ['Health data', DataSheet], healthlink: ['Link Apple Health', HealthLinkSheet], preview: ['Suggested step', PreviewSheet], accept: ['Accept step', AcceptSheet],
@@ -498,7 +518,7 @@ export function Modal() {
   };
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) dispatch('backdrop', undefined, {}); }}>
-      <section ref={ref} key={ui.modalSeq} className={`sheet ${['review', 'settings', 'done'].includes(m) ? 'fullsheet' : ''}${['done', 'review'].includes(m) ? ' cleansheet' : ''}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={onKey}>
+      <section ref={ref} key={ui.modalSeq} className={`sheet ${['review', 'settings', 'goalsedit', 'done'].includes(m) ? 'fullsheet' : ''}${['done', 'review'].includes(m) ? ' cleansheet' : ''}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={onKey}>
         <Btn act="close" cls="close" label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></Btn>
         <Body />
       </section>
