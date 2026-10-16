@@ -160,7 +160,7 @@ export function Aura() {
             <Btn act="open" val="preview">See this small step</Btn><Btn act="observe" cls="text">Just observe for now</Btn></div>
         ) : null}
         {ui.pending ? <TypingBubble /> : null}
-        {ui.chatError ? <div className="chaterror" role="alert"><p>{ui.chatError}</p><small>Your message is kept.</small><Btn act="chat-retry" cls="pillbtn">Try again</Btn></div> : null}
+        {ui.chatError ? <div className="chaterror" role="alert"><p>{ui.chatNeedsDemoConsent ? 'Allow labeled demo records to be sent to Gemini to continue.' : ui.chatError}</p><small>Your message is kept.</small><Btn act={ui.chatNeedsDemoConsent ? 'chat-allow-demo' : 'chat-retry'} cls="pillbtn" disabled={ui.pending}>{ui.chatNeedsDemoConsent ? 'Allow and continue' : 'Try again'}</Btn></div> : null}
         <NextUpCard />
       </div>
       {offer ? (

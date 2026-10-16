@@ -210,7 +210,7 @@ export async function sendToAura(text: string, retry = false, choice?: { message
   const s = S();
   if (!retry) s.messages.push({ role: 'user', text });
   ui.freshMsg = s.messages.length;
-  ui.chatError = null; ui.failedMessage = null; ui.failedChoice = null;
+  ui.chatError = null; ui.chatNeedsDemoConsent = false; ui.failedMessage = null; ui.failedChoice = null;
   ui.pending = true; ui.auraState = 'understanding'; ui.page = 'app'; ui.tab = 'aura'; ui.logOffer = null; ui.draft = null;
   close(); save(); render();
   revealLatestAuraMessage();
@@ -220,6 +220,7 @@ export async function sendToAura(text: string, retry = false, choice?: { message
     await flush();
     const res = await fetch(apiUrl('/api/aura'), { signal: abort.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, today: today(), inputRevision: S().inputRevision || 0, choice, selectedTopic: choice?.topicId || (ui.explore.obsId ? S().observations.find(o => o.id === ui.explore.obsId)?.topicId || null : null) }) });
     const data = await res.json();
+    ui.chatNeedsDemoConsent = res.status === 403 && data.code === 'DEMO_CONSENT_REQUIRED';
     if (!res.ok) throw new Error(data.error || 'Could not reach Aura. Try again.');
     reply = AuraReplySchema.parse(data.reply);
     if (typeof data.inputRevision === 'number') S().inputRevision = data.inputRevision;
@@ -295,6 +296,12 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     }
     case 'chat-photo': openModal('food',{picking:true},el); break;
     case 'chat-retry': if (ui.failedMessage) sendToAura(ui.failedMessage, true, ui.failedChoice || undefined); return;
+    case 'chat-allow-demo': {
+      if (ui.mode !== 'demo' || !ui.chatNeedsDemoConsent || !ui.failedMessage || ui.pending) return;
+      s.profile.includeDemoInAI = true;
+      // sendToAura persists consent before calling Gemini, reusing the saved message.
+      sendToAura(ui.failedMessage, true, ui.failedChoice || undefined); return;
+    }
     case 'nextup-shuffle': ui.nextUp = (ui.nextUp || 0) + 1; break;
     case 'close': close(); break;
     case 'backdrop': close(); break;
