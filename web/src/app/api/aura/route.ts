@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!body.success) return NextResponse.json({ error: 'Write a message first.' }, { status: 400 });
   const state = (await loadState(sid)) || blank();
   // The original Agent remains unchanged. Its canned offline replies are not shown as live AI.
-  if (new URL(req.url).searchParams.get('mode') === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
+  if (new URL(req.url).searchParams.get('mode') === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ code: 'DEMO_CONSENT_REQUIRED', error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
   if (!geminiConfigured()) return NextResponse.json({ status: 'not-integrated', error: 'Gemini is not connected. Your message is saved; no Agent response was generated.' }, { status: 503 });
   if (!allowAiCall(sid)) {
     return NextResponse.json({ reply: { text: 'I need a short rest before the next message. Your records are saved; try again in a little while.', action: null, draft: null, logOffer: null, via: 'verified-summary' } });
