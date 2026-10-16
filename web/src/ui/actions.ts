@@ -210,7 +210,7 @@ export async function sendToAura(text: string, retry = false, choice?: { message
   const s = S();
   if (!retry) s.messages.push({ role: 'user', text });
   ui.freshMsg = s.messages.length;
-  ui.chatError = null; ui.failedMessage = null;
+  ui.chatError = null; ui.failedMessage = null; ui.failedChoice = null;
   ui.pending = true; ui.auraState = 'understanding'; ui.page = 'app'; ui.tab = 'aura'; ui.logOffer = null; ui.draft = null;
   close(); save(); render();
   revealLatestAuraMessage();
@@ -224,9 +224,10 @@ export async function sendToAura(text: string, retry = false, choice?: { message
     reply = AuraReplySchema.parse(data.reply);
     if (typeof data.inputRevision === 'number') S().inputRevision = data.inputRevision;
     if (Array.isArray(data.plans)) S().plans = data.plans;
+    if (Array.isArray(data.safetyEvents)) S().safetyEvents = data.safetyEvents;
   } catch (e) {
     ui.chatError = e instanceof Error ? e.message : 'Could not reach Aura.';
-    ui.failedMessage = text; ui.pending = false; ui.auraState = 'idle'; render(); return;
+    ui.failedMessage = text; ui.failedChoice = choice || null; ui.pending = false; ui.auraState = 'idle'; render(); return;
   } finally { clearTimeout(timeout); }
   if (reply.stopPlanId) {
     const p = findPlan(S(), reply.stopPlanId);
@@ -293,7 +294,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       break;
     }
     case 'chat-photo': openModal('food',{picking:true},el); break;
-    case 'chat-retry': if (ui.failedMessage) sendToAura(ui.failedMessage, true); return;
+    case 'chat-retry': if (ui.failedMessage) sendToAura(ui.failedMessage, true, ui.failedChoice || undefined); return;
     case 'nextup-shuffle': ui.nextUp = (ui.nextUp || 0) + 1; break;
     case 'close': close(); break;
     case 'backdrop': close(); break;
