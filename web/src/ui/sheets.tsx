@@ -1,7 +1,7 @@
 'use client';
 // Bottom sheets (ported from sheets.js and demo.js sheet()).
 import { useEffect, useRef, useState } from 'react';
-import { goalOptions, type GoalSelection } from '@/domain/goals';
+import { goalOptions } from '@/domain/goals';
 import { addDays, daysBetween, dateRange, fmtDate, fmtDay, localDateTime } from '@/domain/dates';
 import { analyze, factorsFor, findings, MIN_DAYS } from '@/domain/uiDiscovery';
 import { SCENARIOS } from '@/domain/demo';
@@ -370,18 +370,18 @@ function AIReviewPanel({ planId }: { planId: string }) {
 // ---------- settings & info ----------
 function GoalsEditSheet() {
   const s = S(), options = goalOptions(s);
-  const [draft, setDraft] = useState<GoalSelection[]>(() => (s.profile.goals || []).map(g => ({ id: g.id, topicIds: s.observations.filter(o => g.observationIds.includes(o.id)).map(o => o.topicId) })));
-  const ready = draft.every(g => g.topicIds.length > 0 && g.topicIds.every(t => options.find(o => o.id === g.id)?.topicIds.includes(t)));
+  const [draft, setDraft] = useState<string[]>(() => (s.profile.goals || []).map(g => g.id));
+  const ready = draft.every(id => options.find(o => o.id === id)?.trackingTopicIds.length);
   return <>
-    <h2>Edit goals</h2><p>Choose your goals and the observations you want to track for each one.</p>
+    <h2>Edit goals</h2><p>Choose your goals. Aura matches them with observations to track.</p>
     <div className="goaledit-options">{options.map(g => {
-      const selected = draft.find(d => d.id === g.id);
+      const selected = draft.includes(g.id);
       return <fieldset className="goaledit-option" key={g.id}>
-        <legend><label><input type="checkbox" checked={!!selected} onChange={e => setDraft(e.target.checked ? [...draft, { id: g.id, topicIds: [] }] : draft.filter(d => d.id !== g.id))} />{g.label}</label></legend>
-        {selected ? <div className="goaledit-observations"><p>Observations for this goal</p>{g.topicIds.map(t => <label key={t}><input type="checkbox" checked={selected.topicIds.includes(t)} onChange={e => setDraft(draft.map(d => d.id !== g.id ? d : { ...d, topicIds: e.target.checked ? [...d.topicIds, t] : d.topicIds.filter(id => id !== t) }))} />{topic(t).name}</label>)}{!selected.topicIds.length ? <small>Choose at least one observation.</small> : null}</div> : null}
+        <legend><label><input type="checkbox" checked={selected} onChange={e => setDraft(e.target.checked ? [...draft, g.id] : draft.filter(id => id !== g.id))} />{g.label}</label></legend>
+        {selected ? <div className="goaledit-observations"><p>Track: {g.trackingTopicIds.map(t => topic(t).name).join(', ') || 'No observation configured'}</p></div> : null}
       </fieldset>;
     })}</div>
-    <p className="soft">Removing a goal keeps your observations and past records. Choosing a stopped observation resumes it.</p>
+    <p className="soft">Goals that share an observation use the same check-in. Removing a goal keeps your observations and past records.</p>
     <Btn act="save-goals" data={{ goals: JSON.stringify(draft) }} disabled={!ready || ui.saving}>Save goals</Btn><ErrorLine />
   </>;
 }
