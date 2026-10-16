@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { blank, setPlanStatus, type State, type Feedback } from '@/domain/state';
-import { isTopicId, TOPIC_IDS } from '@/domain/topics';
+import { blank, normalizeGoals, setPlanStatus, type State, type Feedback } from '@/domain/state';
+import { GOAL_IDS, isTopicId, TOPIC_IDS } from '@/domain/topics';
 import { uid } from '@/domain/dates';
 
 export const modeOf = (req: Request): 'personal' | 'demo' => new URL(req.url).searchParams.get('mode') === 'demo' ? 'demo' : 'personal';
@@ -21,9 +21,9 @@ const intervals = z.record(DaySchema,z.array(z.object({start:TimeSchema,end:z.st
 const hrvSamples = z.record(DaySchema,z.array(z.object({t:TimeSchema,ms:z.number().positive().max(10000),timestamp:z.string().datetime({offset:true}).optional()})).max(2000));
 const origin = z.enum(['personal', 'synthetic', 'demo-live']).optional();
 export const StateSchema = z.object({
-  v: z.literal(2), onboarded: z.boolean(), profile: z.object({ constraint: z.string().max(500), attempts: z.array(z.string().max(300)).max(50), attemptsNote: z.string().max(2000), goals: z.array(z.object({id:z.string().min(1).max(100),label:z.string().max(500),observationIds:z.array(z.string()).max(10),priority:z.number().int().min(1).max(100)})).max(50).optional(), includeCycleContext:z.boolean().optional(),includeDemoInAI:z.boolean().optional() }).passthrough(),
+  v: z.literal(2), onboarded: z.boolean(), profile: z.object({ constraint: z.string().max(500), attempts: z.array(z.string().max(300)).max(50), attemptsNote: z.string().max(2000), goals: z.array(z.enum(GOAL_IDS as [string, ...string[]])).max(GOAL_IDS.length).refine(g => new Set(g).size === g.length, 'Duplicate goal').optional(), includeCycleContext:z.boolean().optional(),includeDemoInAI:z.boolean().optional() }).passthrough(),
   observations: z.array(z.object({ id: z.string().min(1).max(100), topicId, time: TimeSchema, status: z.enum(['active','paused']), createdAt: z.string() }).passthrough()).max(10),
-  checkins: z.array(z.object({ id: z.string().min(1).max(100), observationId: z.string(), topicId, occurredAt, date: DaySchema, status: z.enum(['recorded','unknown','skipped','text-only']), score: z.number().int().min(1).max(5).nullable(), origin, note: z.string().max(2000).optional() }).passthrough()).max(5000),
+  checkins: z.array(z.object({ id: z.string().min(1).max(100), observationId: z.string(), topicId, occurredAt, date: DaySchema, status: z.enum(['recorded','unknown','skipped']), score: z.number().int().min(1).max(5).nullable(), origin, note: z.string().max(2000).optional() }).passthrough()).max(5000),
   entries: z.array(z.object({ id: z.string().min(1).max(100), kind: z.enum(['food','caffeine']), occurredAt, date: DaySchema, origin, name: z.string().max(500), caffeinated:z.enum(['yes','no','unknown']).optional(),mg:z.number().min(0).max(2000).nullable().optional(), note: z.string().max(2000).optional() }).passthrough()).max(5000),
   plans: z.array(z.object({}).passthrough()).max(500), feedbacks: z.array(z.object({}).passthrough()).max(2000), decisions: z.array(z.object({}).passthrough()).max(1000),
   messages: z.array(z.object({ role: z.enum(['user','guide']), text: z.string().max(4000) }).passthrough()).max(1000),
@@ -37,6 +37,7 @@ export function migrateState(raw: State | null, mode: 'personal' | 'demo'): Stat
   const s = Object.assign(blank(), raw || {});
   s.mode = mode; s.inputRevision ||= 0; s.aiReviews ||= []; s.safetyEvents ||= []; s.caffeineCoverage ||= [];
   s.healthTypes.hrv ??= true;
+  normalizeGoals(s);
   // Retain legacy fictional imports for recovery, but do not treat them as personal health data.
   if (mode === 'personal' && s.healthImport?.via === 'simulated') s.dataSource = 'none';
   s.checkins.forEach(c => { c.cutoff ||= c.occurredAt; c.timezone ||= s.timezone; });
@@ -59,9 +60,7 @@ export function validateRelations(s: State) {
   if (new Set(ids).size !== ids.length) throw new Error('Duplicate record ID');
   for (const o of s.observations) {
     if (!isTopicId(o.topicId)) throw new Error('Unknown topic');
-    if ((o.goalIds || []).some(id => !s.profile.goals?.some(g => g.id === id && g.observationIds.includes(o.id)))) throw new Error('Observation goal link is not confirmed');
   }
-  for (const g of s.profile.goals || []) if (g.observationIds.some(id => !s.observations.some(o => o.id === id && o.goalIds?.includes(g.id)))) throw new Error('Goal observation link is not confirmed');
   for (const c of s.checkins) {
     const o = s.observations.find(o => o.id === c.observationId);
     if (!o || o.topicId !== c.topicId) throw new Error('Check-in does not match its observation');

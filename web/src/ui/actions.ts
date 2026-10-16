@@ -12,7 +12,7 @@ import {
   acceptPlan, activeObservations, addObservation, blank, currentPlans, dayCheckin, observation, plan as findPlan,
   removeRecord, saveCheckin, saveEntry, setPlanStatus, type CheckinStatus, type Feedback, type HealthImport, type Message, type PhotoExtraction, type StepDraft
 } from '@/domain/state';
-import { CONCERNS, GOALS, topic, isTopicId, type TopicId } from '@/domain/topics';
+import { isGoalId, topic, isTopicId, type TopicId } from '@/domain/topics';
 import { apiUrl, command, switchMode, refreshLinkedHealth, flush, render, resetAll, S, save, setSt, toast, today, ui, type ModalData } from './store';
 
 export type ActData = Record<string, string | undefined>;
@@ -22,7 +22,7 @@ export const SAMPLE_PHOTOS = [
   { id: 'salad', src: '/assets/food/salad.jpg', name: 'Spinach salad' },
   { id: 'lasagna', src: '/assets/food/lasagna.jpg', name: 'Lasagna' }
 ];
-export const OB_TITLES = ['What’s been getting in the way lately?', 'Your first observation.', 'When should Aura ask?', 'What have you tried so far?', 'What should a step work around?', 'Sync with Apple Health', 'Check your starting point.'];
+export const OB_TITLES = ['What’s been getting in the way lately?', 'Your first daily check-in.', 'When should Aura ask?', 'What have you tried so far?', 'What should a step work around?', 'Sync with Apple Health', 'Check your starting point.'];
 export const OB_LAST = OB_TITLES.length - 1;
 
 const val = (id: string) => { const el = document.getElementById(id) as HTMLInputElement | null; return el ? el.value : ''; };
@@ -73,7 +73,7 @@ export const focusTopic = (): TopicId => (activeObservations(S())[0] || { topicI
 // ---------- onboarding ----------
 export function startOnboarding() {
   const s = S();
-  ui.ob = { consent: { terms: false, health: false, share: false }, concerns: [], goalId: null, topicId: null, time: null, attempts: [], attemptsNote: '', constraint: 'Keep it simple', data: 'apple-health', types: { sleep: true, activity: true, cycle: true, hrv: true } };
+  ui.ob = { consent: { terms: false, health: false, share: false }, concerns: [], topicId: null, time: null, attempts: [], attemptsNote: '', constraint: 'Keep it simple', data: 'apple-health', types: { sleep: true, activity: true, cycle: true, hrv: true } };
   // Apple Health starts on (simulated unless a real export or the bridge is used); the user can switch it off.
   if (ui.mode === 'demo' && !s.healthImport) { s.healthImport = simulateAppleHealth(today()); save(); }
   ui.step = 0; ui.fromReview = false; ui.page = 'onboarding';
@@ -85,13 +85,11 @@ function saveObFields() {
 }
 function finishOnboarding() {
   const s = S(), o = ui.ob!;
-  s.profile = { ...s.profile, consent: { ...o.consent, at: new Date().toISOString() }, concerns: o.concerns, goalId: (GOALS.find(g => g.topicId === o.topicId) || { id: null }).id, attempts: o.attempts, attemptsNote: o.attemptsNote, constraint: o.constraint, context: [] };
+  // Each concern picked is stored as one goal; goals kept from before keep their order.
+  const kept = (s.profile.goals || []).filter(id => o.concerns.includes(id));
+  s.profile = { ...s.profile, consent: { ...o.consent, at: new Date().toISOString() }, goals: [...kept, ...o.concerns.filter(id => !kept.includes(id))], attempts: o.attempts, attemptsNote: o.attemptsNote, constraint: o.constraint, context: [] };
   s.healthTypes = { ...o.types };
   const obs = addObservation(s, o.topicId!, o.time);
-  const priorGoals = s.profile.goals || [];
-  s.profile.goals = o.concerns.map((id,i) => priorGoals.find(g => g.id === id) || ({ id, label: CONCERNS[id]?.goal || id, observationIds: [], priority: i+1 }));
-  obs.goalIds = s.profile.goals.filter(g => !!CONCERNS[g.id]?.w[obs.topicId]).map(g => g.id);
-  for (const g of s.profile.goals) if (obs.goalIds.includes(g.id) && !g.observationIds.includes(obs.id)) g.observationIds.push(obs.id);
   s.onboarded = true;
   setDataSource(s, o.data === 'apple-health' && !s.healthImport ? 'none' : o.data, today());
   save();
@@ -284,7 +282,8 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     }
     case 'open': {
       const m: ModalData = { obsId: d.obs, recId: d.rec, planId: d.plan, date: d.date, doc: d.doc };
-      if (ui.modal === 'settings') m.back = 'settings';
+      if (ui.modal === 'settings' || ui.modal === 'goals') m.back = ui.modal;
+      if (isTopicId(d.topic)) m.topicId = d.topic;
       if (d.choice) m.choice = d.choice;
       if (v === 'checkin' && !d.rec && !d.keepDate && d.date === undefined) m.date = ui.tab === 'explore' ? ui.explore.date || undefined : undefined;
       if (v === 'caffeine' && ui.tab === 'explore' && !d.rec && !d.date) m.date = ui.explore.date || undefined;
@@ -341,7 +340,7 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       saveObFields();
       const o = ui.ob!;
       if (ui.step === 0 && !o.concerns.length) return err('Choose at least one.');
-      if (ui.step === 1 && !o.topicId) return err('Choose an observation to continue.');
+      if (ui.step === 1 && !o.topicId) return err('Choose a check-in to continue.');
       if (ui.step === 2 && !o.time) o.time = topic(o.topicId).timing.defaultTime;
       if (ui.step === OB_LAST && !(o.consent.terms && o.consent.health)) return err('Agree to the terms and allow data use to start.');
       if (ui.step === OB_LAST) finishOnboarding();
@@ -396,12 +395,11 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
     }
     case 'save-checkin': {
       const o = observation(s, ui.m.obsId)!, time = val('chk-time');
-      if (!ui.m.choice) return err('Slide to answer, or choose “Not sure” or “Skip today”, or save your words only.');
+      if (!ui.m.choice) return err('Slide to answer, or choose “Not sure” or “Skip today”.');
       if (!time) return err('Add when this was.', '#chk-time');
       if (time.slice(0, 16) > localDateTime()) return err('This time is in the future.', '#chk-time');
       const rec = ui.m.recId ? s.checkins.find(c => c.id === ui.m.recId) : null;
       const recorded = /^[1-5]$/.test(ui.m.choice);
-      if (ui.m.choice === 'text-only' && !val('chk-note').trim()) return err('Add the words you want to save.', '#chk-note');
       saveCheckin(s, Object.assign(rec ? { id: rec.id, source: rec.source, feedbackId: rec.feedbackId, createdAt: rec.createdAt } : {}, {
         observationId: o.id, topicId: o.topicId, occurredAt: time, status: (recorded ? 'recorded' : ui.m.choice) as CheckinStatus, score: recorded ? +ui.m.choice : null, note: val('chk-note').trim()
       }));
@@ -467,26 +465,30 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       const o = observation(s, ui.m.obsId)!, time = val('obsedit-time');
       if (!time) return err('Choose a time.', '#obsedit-time');
       o.time = time;
-      o.goalIds = (s.profile.goals || []).filter(g => checked(`goal-link-${g.id}`)).map(g => g.id);
-      for (const g of s.profile.goals || []) g.observationIds = g.observationIds.filter(id => id !== o.id).concat(o.goalIds.includes(g.id) ? [o.id] : []);
       save(); toast(`${topic(o.topicId).name} at ${time}`); close(); break;
     }
     case 'pause-obs': {
       if (!confirmTap(key)) return;
-      const o = observation(s, ui.m.obsId)!; o.status = 'paused'; save(); toast(`Stopped observing ${topic(o.topicId).name.toLowerCase()}`); close(); break;
+      const o = observation(s, ui.m.obsId)!; o.status = 'paused'; save(); toast(`Paused the ${topic(o.topicId).name.toLowerCase()} check-in`); close(); break;
     }
     case 'pick-topic': ui.m.topicId = v as TopicId; break;
-    case 'save-obs': { const o = addObservation(s, ui.m.topicId!, val('obs-time')); o.goalIds = (s.profile.goals || []).filter(g => !!CONCERNS[g.id]?.w[o.topicId]).map(g => g.id); for (const g of s.profile.goals || []) if (o.goalIds.includes(g.id) && !g.observationIds.includes(o.id)) g.observationIds.push(o.id); o.goalIds = (s.profile.goals || []).filter(g => checked(`goal-link-${g.id}`)).map(g => g.id); for (const g of s.profile.goals || []) g.observationIds = g.observationIds.filter(id => id !== o.id).concat(o.goalIds.includes(g.id) ? [o.id] : []); if (s.dataSource === 'sample') seedSample(s, o, today()); save(); ui.explore.obsId = o.id; toast(`${topic(o.topicId).name} added`); close(); break; }
+    case 'save-obs': { const o = addObservation(s, ui.m.topicId!, val('obs-time')); if (s.dataSource === 'sample') seedSample(s, o, today()); save(); ui.explore.obsId = o.id; toast(`${topic(o.topicId).name} added`); close(); break; }
     case 'exp-obs': ui.explore.obsId = v!; break;
     case 'exp-date': ui.explore.date = v!; break;
     case 'exp-metric': ui.explore.metric = v!; break;
     case 'exp-range-set': ui.explore.range = +v!; break;
     case 'goal-remove': {
-      s.profile.goals = (s.profile.goals || []).filter(g => g.id !== v);
-      s.observations.forEach(o => o.goalIds = (o.goalIds || []).filter(id => id !== v));
-      s.profile.concerns = (s.profile.concerns || []).filter(x => x !== v); save();
+      // Check-ins and records stay; only the goal goes.
+      s.profile.goals = (s.profile.goals || []).filter(id => id !== v); save();
       toast('Removed the goal. Add it back in Settings.');
       break;
+    }
+    case 'goal-toggle': {
+      if (!isGoalId(v)) return;
+      const goals = s.profile.goals || [];
+      if (goals.includes(v)) { if (goals.length === 1) return err('Keep at least one goal.'); s.profile.goals = goals.filter(id => id !== v); }
+      else s.profile.goals = [...goals, v];
+      save(); break;
     }
     case 'exp-goto': if (v! < addDays(today(), -(ui.explore.range - 1))) ui.explore.range = 14; ui.explore.date = v!; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
     case 'health-toggle': openModal('data', {}, el); break;
@@ -570,14 +572,14 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       (s.caffeineCoverage ||= []).push({ id: uid('cov'), from: `${date}T00:00`, to: date === today() ? localDateTime() : `${addDays(date,1)}T00:00`, status: 'no', confirmed: true, origin: ui.mode === 'demo' ? 'demo-live' : 'personal' }); save(); toast(date === today() ? 'No caffeine confirmed up to now' : 'No caffeine confirmed for this day'); close(); break;
     }
     case 'profile-save': s.profile.constraint = val('profile-constraint').trim() || 'Keep it simple'; save(); toast('Constraints saved'); break;
-    case 'goal-priority': { const g = s.profile.goals?.find(g => g.id === v); if (g) { s.profile.goals!.forEach(g => g.priority += 1); g.priority = 1; save(); } break; }
+    case 'goal-priority': { const goals = s.profile.goals || []; if (goals.includes(v!)) { s.profile.goals = [v!, ...goals.filter(id => id !== v)]; save(); } break; }
     case 'exp-week': ui.explore.week = Math.min(0, (ui.explore.week || 0) + Number(v)); break;
 
     // about
     case 'resetup': {
       close(); startOnboarding();
       const o = activeObservations(s)[0];
-      Object.assign(ui.ob!, { consent: Object.assign({ terms: false, health: false, share: false }, s.profile.consent || {}), concerns: s.profile.concerns || [], rankedFor: (s.profile.concerns || []).join(','), goalId: s.profile.goalId, topicId: o?.topicId || null, time: o?.time || null, attempts: s.profile.attempts || [], attemptsNote: s.profile.attemptsNote || '', constraint: s.profile.constraint, data: s.dataSource, types: { ...s.healthTypes } });
+      Object.assign(ui.ob!, { consent: Object.assign({ terms: false, health: false, share: false }, s.profile.consent || {}), concerns: s.profile.goals || [], rankedFor: (s.profile.goals || []).join(','), topicId: o?.topicId || null, time: o?.time || null, attempts: s.profile.attempts || [], attemptsNote: s.profile.attemptsNote || '', constraint: s.profile.constraint, data: s.dataSource, types: { ...s.healthTypes } });
       ui.step = OB_LAST;
       break;
     }

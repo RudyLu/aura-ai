@@ -1,15 +1,16 @@
-// Data model (ported from store.js). Observations are independent: every record
-// points to the observation it belongs to. Unlike the prototype, every function takes
+// Data model (ported from store.js). Observations (shown as "check-ins") are independent:
+// every record points to the observation it belongs to. Goals are an ordered list of
+// catalog IDs; which observations serve a goal is worked out from the topic table. Unlike the prototype, every function takes
 // the state explicitly so the same code runs in the browser and on the server.
 import { localDateTime, uid } from './dates';
-import { topic, type TopicId } from './topics';
+import { GOAL_CATALOG, goalSuits, isGoalId, topic, type TopicId } from './topics';
 
-export type CheckinStatus = 'recorded' | 'unknown' | 'skipped' | 'text-only';
+export type CheckinStatus = 'recorded' | 'unknown' | 'skipped';
 export type DataSource = 'none' | 'sample' | 'apple-health';
 export type PlanStatus = 'active' | 'observing' | 'stopped' | 'replaced';
 
 export type Origin = 'personal' | 'synthetic' | 'demo-live';
-export interface Observation { id: string; topicId: TopicId; time: string; status: 'active' | 'paused'; createdAt: string; goalIds?: string[]; confirmed?: boolean }
+export interface Observation { id: string; topicId: TopicId; time: string; status: 'active' | 'paused'; createdAt: string }
 export interface Checkin {
   origin?: Origin; cutoff?: string; timezone?: string;
   id: string; observationId: string; topicId: TopicId; source: string; status: CheckinStatus; score: number | null;
@@ -59,9 +60,10 @@ export interface HealthImport {
   records: number | null; fileName?: string; granted?: string[];
 }
 export interface Profile {
-  goals?: { id: string; label: string; observationIds: string[]; priority: number }[]; includeCycleContext?: boolean; includeDemoInAI?: boolean;
+  goals?: string[]; // goal catalog IDs; the first is the priority
+  includeCycleContext?: boolean; includeDemoInAI?: boolean;
   consent?: { terms: boolean; health: boolean; share: boolean; at?: string };
-  concerns?: string[]; goalId: string | null; attempts: string[]; attemptsNote: string; constraint: string; context: string[];
+  attempts: string[]; attemptsNote: string; constraint: string; context: string[];
 }
 export interface AIReview {
   id: string; contract: 'aura.review.v1'; requestId: string; planId: string; planVersion: number; inputRevision: number;
@@ -84,7 +86,7 @@ export interface State {
 export const blank = (): State => ({
   v: 2, inputRevision: 0, mode: 'personal', aiReviews: [], safetyEvents: [], caffeineCoverage: [],
   onboarded: false,
-  profile: { goalId: null, attempts: [], attemptsNote: '', context: [], constraint: 'Keep it simple' },
+  profile: { goals: [], attempts: [], attemptsNote: '', context: [], constraint: 'Keep it simple' },
   observations: [], checkins: [], entries: [], plans: [], feedbacks: [], decisions: [], messages: [],
   dataSource: 'none',
   healthTypes: { sleep: true, activity: true, cycle: true, hrv: true },
@@ -103,12 +105,40 @@ export function addObservation(s: State, topicId: TopicId, time?: string | null)
     return existing;
   }
   topic(topicId);
-  const o: Observation = { confirmed: true, id: uid('obs'), topicId, time: time || topic(topicId).timing.defaultTime, status: 'active', createdAt: new Date().toISOString() };
+  const o: Observation = { id: uid('obs'), topicId, time: time || topic(topicId).timing.defaultTime, status: 'active', createdAt: new Date().toISOString() };
   s.observations.push(o);
   return o;
 }
 export const observation = (s: State, id: string | undefined) => s.observations.find(o => o.id === id);
 export const activeObservations = (s: State) => s.observations.filter(o => o.status === 'active');
+
+// ---------- goals ----------
+export const userGoals = (s: State) => (s.profile.goals || []).filter(isGoalId).map(id => GOAL_CATALOG[id]);
+// The suitable check-ins the user is tracking for a goal.
+export const goalObservations = (s: State, goalId: string) => activeObservations(s).filter(o => goalSuits(goalId, o.topicId));
+// The user's goals a check-in topic serves.
+export const goalsForTopic = (s: State, topicId: TopicId) => userGoals(s).filter(g => g.topics.includes(topicId));
+
+// Older records stored concerns, a single goalId, goal objects and two-way goal ↔ observation
+// links. Fold them into the ordered goal list and drop the links.
+const DEMO_GOAL: Record<string, string> = { 'goal:evening-energy': 'drained', 'goal:rested-waking': 'wake-tired', 'goal:afternoon-sleepiness': 'slump', 'goal:stress': 'stressed', 'goal:productivity': 'focus' };
+export function normalizeGoals(s: State) {
+  const p = s.profile as Profile & { goals?: unknown[]; concerns?: string[]; goalId?: unknown };
+  const current = Array.isArray(p.goals) && p.goals.length && p.goals.every(g => typeof g === 'string');
+  // A current goal list is left for validation to accept or reject; legacy forms are converted.
+  if (!current) {
+    const legacy = Array.isArray(p.goals) && p.goals.length
+      ? (p.goals as { id: string; priority?: number }[]).filter(g => g && typeof g === 'object').sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0)).map(g => DEMO_GOAL[g.id] || g.id)
+      : Array.isArray(p.concerns) ? p.concerns : [];
+    p.goals = [...new Set(legacy)].filter(isGoalId);
+  }
+  delete p.concerns; delete p.goalId;
+  for (const o of s.observations as (Observation & { goalIds?: unknown; confirmed?: unknown })[]) { delete o.goalIds; delete o.confirmed; }
+  // "Save words only" was removed; keep the words as a "Not sure" answer.
+  for (const c of s.checkins as (Omit<Checkin, 'status'> & { status: string })[]) if (c.status === 'text-only') { c.status = 'unknown'; c.score = null; }
+  for (const f of s.feedbacks) if (f.answer === 'text-only') f.answer = 'unknown';
+  return s;
+}
 
 // ---------- check-ins ----------
 export function saveCheckin(s: State, fields: Partial<Checkin> & { observationId: string; topicId: TopicId; status: CheckinStatus }): Checkin {
@@ -158,7 +188,7 @@ export function acceptPlan(s: State, draft: Omit<StepDraft, 'step'> & { step?: s
     .forEach(p => setPlanStatus(p, 'replaced'));
   const plan: Plan = {
     id: uid('plan'), lineageId, version: prior.length + 1,
-    relatedObservationIds: s.observations.filter(o => o.id !== fields.observationId && o.status === 'active' && (o.goalIds || []).some(g => s.observations.find(primary => primary.id === fields.observationId)?.goalIds?.includes(g))).map(o => o.id),
+    relatedObservationIds: activeObservations(s).filter(o => o.id !== fields.observationId && goalsForTopic(s, fields.topicId).some(g => g.topics.includes(o.topicId))).map(o => o.id),
     stepId: draft.stepId, title: draft.title, desc: draft.desc, duration: draft.duration, days: draft.days,
     kind: draft.kind || 'step', fromFactor: draft.fromFactor || null,
     step: fields.step, start: fields.start, review: fields.review, observationId: fields.observationId, topicId: fields.topicId,

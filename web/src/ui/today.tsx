@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { addDays, dateRange, fmtDay } from '@/domain/dates';
 import { analyze, findings } from '@/domain/uiDiscovery';
-import { activeObservations, currentPlans, dayCheckin, observation, type Checkin, type Entry, type Observation, type Plan, type State } from '@/domain/state';
-import { CONCERNS, topic } from '@/domain/topics';
+import { activeObservations, currentPlans, dayCheckin, observation, userGoals, type Checkin, type Entry, type Observation, type Plan, type State } from '@/domain/state';
+import { topic } from '@/domain/topics';
 import { AuraMark, Btn, checkinStatus, GEAR, goalArt, LOG_ART, plural, Raw, ScaleSlider } from './core';
 import { dispatch } from './actions';
 import { render, S, today, ui } from './store';
@@ -226,19 +226,19 @@ function PlanRow({ p }: { p: Plan }) {
 // Top of Today: the goals the user chose in setup.
 function GoalHeader() {
   const s = S();
-  const goals = (s.profile.concerns || []).map(c => CONCERNS[c]).filter(Boolean);
+  const goals = userGoals(s);
   const gear = <button type="button" className="gear" aria-label="Settings" onClick={e => dispatch('open', 'settings', {}, e.currentTarget)} dangerouslySetInnerHTML={{ __html: GEAR }} />;
   if (!goals.length) return <div className="greeting goalhead"><div className="goaltop"><p>{greeting()}, Alex</p>{gear}</div><h1>Make room<br />for yourself.</h1></div>;
   const more = goals.slice(1);
   return (
     <div className="greeting goalhead">
       <div className="goaltop"><p>{greeting()}, Alex</p>{gear}</div>
-      <div className="goalmain"><Raw cls="goaltile" html={goalArt(goals[0].group, 64)} /><div><p className="goallabel">Your main goal</p><h1>{goals[0].goal}</h1></div></div>
+      <div className="goalmain"><Raw cls="goaltile" html={goalArt(goals[0].group, 64)} /><div><p className="goallabel">Your main goal</p><h1>{goals[0].label}</h1></div></div>
       {more.length ? (
         <div className={`moregoals ${ui.goalsOpen || more.length > 2 ? 'overflows' : ''}`}>
           <span className="morelabel">Also working on</span>
           <ul className={`goaltags ${ui.goalsOpen ? 'open' : 'clamp'}`} id="goaltags">
-            {more.map(g => <li key={g.id}>#{g.goal.charAt(0).toLowerCase() + g.goal.slice(1)}<Btn act="goal-remove" val={g.id} cls="" label={`Remove goal: ${g.goal}`}>×</Btn></li>)}
+            {more.map(g => <li key={g.id}>#{g.label.charAt(0).toLowerCase() + g.label.slice(1)}<Btn act="goal-remove" val={g.id} cls="" label={`Remove goal: ${g.label}`}>×</Btn></li>)}
           </ul>
           <button type="button" className="seeall" aria-controls="goaltags" aria-expanded={ui.goalsOpen} onClick={e => dispatch('goals-toggle', undefined, {}, e.currentTarget)}>{ui.goalsOpen ? 'Show less' : `See all (${more.length})`}</button>
         </div>
@@ -279,7 +279,6 @@ export function Today() {
     {s.demo ? <button type="button" className="demochip" onClick={e => dispatch('open','demo',{},e.currentTarget)}>Demo timeline · Day {s.demo.day} <span>Change</span></button> : null}
     <div className="pagehead todayhead"><div className="todaytop"><p className="eyebrow">Today · {new Date().toLocaleDateString('en',{weekday:'short',day:'2-digit'})}</p><button className="gear" aria-label="Settings" onClick={e => dispatch('open','settings',{},e.currentTarget)} dangerouslySetInnerHTML={{__html:GEAR}} /></div>
       <h1>{left ? `${['No','One','Two','Three','Four','Five','Six'][left] || left} ${left === 1 ? 'thing' : 'things'} left` : 'All done for today'}{left && obs[0] ? <> for your <em style={{color:TOPIC_HUES[obs[0].topicId]}}>{topic(obs[0].topicId).construct.toLowerCase()}</em></> : null}</h1>
-      {s.profile.goals?.length ? <details className="goalcontext"><summary>Your goals ({s.profile.goals.length})</summary><ul>{s.profile.goals.map(g => <li key={g.id}>{g.label}{g.priority === 1 ? ' · priority' : ''}</li>)}</ul></details> : null}
     </div>
     <section className="chartcard tcard" aria-labelledby="h-check"><div className="chartcardhead"><h2 id="h-check">Check in</h2><small>{focus ? `${focus.time} · ${topic(focus.topicId).name}` : 'All done'}</small></div>
       {focus ? <><p className="checkq">{topic(focus.topicId).question}</p><QuickScale o={focus} /></> : <p className="soft checkdone">Everything checked in today.</p>}

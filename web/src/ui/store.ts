@@ -8,7 +8,7 @@ import type { TopicId } from '@/domain/topics';
 import { todayISO } from '@/domain/dates';
 
 export interface OnboardingDraft {
-  consent: { terms: boolean; health: boolean; share: boolean }; concerns: string[]; goalId: string | null;
+  consent: { terms: boolean; health: boolean; share: boolean }; concerns: string[];
   topicId: TopicId | null; time: string | null; attempts: string[]; attemptsNote: string; constraint: string;
   data: 'none' | 'sample' | 'apple-health'; types: { sleep: boolean; activity: boolean; cycle: boolean; hrv?: boolean }; rankedFor?: string;
 }
@@ -159,10 +159,17 @@ export async function refreshLinkedHealth() {
   try {
     const res = await fetch(apiUrl('/api/session'));
     const { linkedHealth, state } = await res.json();
-    if (mode === ui.mode && linkedHealth && adoptLinked(st, linkedHealth)) {
-      st.inputRevision = state.inputRevision; st.plans = state.plans; st.aiReviews = state.aiReviews; st.safetyEvents = state.safetyEvents;
-      ui.reviewResult = null; render();
+    if (mode !== ui.mode || !state) return;
+    const adopted = !!linkedHealth && adoptLinked(st, linkedHealth);
+    // Finishing an iOS link saves the import into the server's records and advances their
+    // revision. Take the new revision (and the server-owned records) even when this browser
+    // already holds a newer import, or every later save is rejected as stale.
+    const advanced = (state.inputRevision || 0) > (st.inputRevision || 0);
+    if (advanced) {
+      if (state.healthImport && (!st.healthImport || st.healthImport.importedAt <= state.healthImport.importedAt)) { st.healthImport = state.healthImport; st.dataSource = state.dataSource; }
+      st.inputRevision = state.inputRevision; st.plans = state.plans; st.feedbacks = state.feedbacks; st.decisions = state.decisions; st.aiReviews = state.aiReviews; st.safetyEvents = state.safetyEvents;
     }
+    if (adopted || advanced) { ui.reviewResult = null; render(); }
   } catch { /* Retain previous records; manual import/link stays available. */ }
 }
 

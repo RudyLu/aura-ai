@@ -23,7 +23,7 @@ export function buildDemo(day: number, now = new Date()): State {
 
   st.onboarded = true; st.mode = 'demo';
   st.demo = { day, start };
-  st.profile = { consent: { terms: true, health: true, share: false, at: now.toISOString() }, concerns: ['drained', 'caffeine', 'wake-tired'], goalId: 'evening-energy', attempts: ['Less or earlier caffeine'], attemptsNote: '', constraint: 'Overtime and changing plans', context: [] };
+  st.profile = { consent: { terms: true, health: true, share: false, at: now.toISOString() }, goals: ['drained', 'caffeine', 'wake-tired'], attempts: ['Less or earlier caffeine'], attemptsNote: '', constraint: 'Overtime and changing plans', context: [] };
   st.healthTypes = { sleep: true, activity: true, cycle: true, hrv: true };
   st.healthImport = simulateAppleHealth(today);
   // Over the scenario's own days, use a varied week so both sides of each comparison fill.
@@ -100,7 +100,5 @@ export function buildDemo(day: number, now = new Date()): State {
       status: st.entries.some(e => e.kind === 'caffeine' && e.date === d && e.occurredAt.slice(11) >= '14:00') ? 'yes' : 'no', origin: 'synthetic' });
   }
   st.checkins.forEach(r => r.origin = 'synthetic'); st.entries.forEach(r => r.origin = 'synthetic'); st.feedbacks.forEach(r => r.origin = 'synthetic');
-  st.profile.goals = st.observations.map((o, i) => ({ id: `goal:${o.topicId}`, label: o.topicId === 'evening-energy' ? 'Have energy after work' : 'Feel rested when I wake up', observationIds: [o.id], priority: i + 1 }));
-  for (const o of st.observations) o.goalIds = st.profile.goals.filter(g => g.observationIds.includes(o.id)).map(g => g.id);
   return st;
 }

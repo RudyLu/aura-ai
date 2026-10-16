@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { TOPIC_IDS, topic } from './topics';
-import { addObservation, blank, saveCheckin, saveEntry } from './state';
+import { GOAL_CATALOG, TOPIC_IDS, topic } from './topics';
+import { addObservation, blank, goalObservations, goalsForTopic, normalizeGoals, saveCheckin, saveEntry } from './state';
 import { analyze, caffeineWindow } from './uiDiscovery';
 import { hrvBaseline, hrvDay, hrvIndex, hrvSampleInWorkout } from './hrv';
 import { simulateAppleHealth, createExportParser } from './health';
@@ -63,5 +63,34 @@ describe('HRV boundaries and pending rules', () => {
     const parser = createExportParser(); const xml = '<Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" unit="s" value="0.05" startDate="2026-10-07 08:00:00 +0800" endDate="2026-10-07 08:00:00 +0800"/><Workout startDate="2026-10-07 23:00:00 +0800" endDate="2026-10-08 09:00:00 +0800"/>';
     parser.push(xml.slice(0,120)); parser.push(xml.slice(120)); const h = parser.finish();
     expect(h.hrvSamples['2026-10-07'][0].ms).toBe(50); expect(h.timezone).toBe('+0800'); expect(h.workouts['2026-10-08'][0]).toMatchObject({start:'00:00',end:'09:00'});
+  });
+});
+
+describe('goal model: goals plus check-ins, links from the goal table', () => {
+  it('folds legacy goals, concerns and two-way links into one ordered goal list', () => {
+    const s = blank(), o = addObservation(s,'evening-energy');
+    Object.assign(s.profile, { concerns:['drained'], goalId:'evening-energy', goals:[{id:'goal:rested-waking',priority:2,observationIds:[]},{id:'goal:evening-energy',priority:1,observationIds:[o.id]}] });
+    Object.assign(o, { goalIds:['goal:evening-energy'], confirmed:true });
+    normalizeGoals(s);
+    expect(s.profile.goals).toEqual(['drained','wake-tired']);
+    expect(s.profile).not.toHaveProperty('concerns'); expect(s.profile).not.toHaveProperty('goalId'); expect(o).not.toHaveProperty('goalIds');
+    const old = blank(); Object.assign(old.profile, { concerns:['slump','unknown-concern'] }); normalizeGoals(old);
+    expect(old.profile.goals).toEqual(['slump']);
+  });
+  it('a goal shows the suitable check-ins being tracked; paused ones and unrelated ones are left out', () => {
+    const s = blank(); s.profile.goals = ['caffeine','stressed'];
+    const energy = addObservation(s,'evening-energy'), slump = addObservation(s,'afternoon-sleepiness'), prod = addObservation(s,'productivity');
+    expect(goalObservations(s,'caffeine').map(o => o.id)).toEqual([energy.id, slump.id]);
+    expect(goalsForTopic(s,'productivity')).toEqual([]); expect(goalObservations(s,'stressed').map(o => o.id)).toEqual([energy.id]);
+    slump.status = 'paused'; expect(goalObservations(s,'caffeine').map(o => o.id)).toEqual([energy.id]);
+    expect(GOAL_CATALOG.caffeine.topics).toEqual(['afternoon-sleepiness','evening-energy']); void prod;
+  });
+  it('the demo stores its goals as catalog IDs', () => {
+    expect(buildDemo(10).profile.goals).toEqual(['drained','caffeine','wake-tired']);
+  });
+  it('export.xml keeps only the last 60 days of timestamped HRV detail', () => {
+    const p = createExportParser(), hrv = (d: string) => `<Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" unit="ms" value="50" startDate="${d} 10:00:00 +0800" endDate="${d} 10:00:00 +0800"/>`;
+    p.push(hrv('2023-01-01') + hrv('2026-08-01') + hrv('2026-09-29'));
+    expect(Object.keys(p.finish().hrvSamples!)).toEqual(['2026-08-01','2026-09-29']);
   });
 });

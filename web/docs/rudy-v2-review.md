@@ -17,11 +17,11 @@ Merge after the bugs below are fixed, the Agent work is in, and the M01–M14 ch
 
 | # | Where | Problem | Status |
 |---|---|---|---|
-| 1 | `web/src/ui/actions.ts` `finishOnboarding` | Edit goals keeps an observation's link to a goal the user removed. The server rejects it ("Observation goal link is not confirmed"), and every save after that fails with 400. | Fixed locally, not committed; checked in the browser (old code fails, new code saves). The final shape depends on the goal model decision below. |
-| 2 | `web/src/ui/actions.ts` `done-step` | After a "Save words only" check-in, answering "Did you do your step?" sends `answer: 'text-only'`, which `/api/command` rejects. | Server fix plus test done locally. **To be reverted:** Ellie decided to remove the option instead. |
-| 3 | `web/src/domain/health.ts` export parser | export.xml now keeps every HRV sample, workout and mindful session for the file's whole history. Years of Apple Watch data come to about 1 MB, over the 900 KB state limit, so every save fails with 413. | Open. Suggest keeping only the last 60 days, as the iOS app does. |
-| 4 | `web/src/ui/store.ts` `refreshLinkedHealth` | Finishing an iOS link raises the server's revision number, but the browser copies the new number only when `adoptLinked` returns true. Otherwise every save fails with 409 until reload. The server also overwrites a newer import. | Open. |
-| 5 | `web/src/app/api/session/route.ts` | The old single-slot state is copied to `<sid>-legacy-demo`, and "Delete all records" never deletes that copy. | Open. Privacy clean-up. |
+| 1 | `web/src/ui/actions.ts` `finishOnboarding` | Edit goals keeps an observation's link to a goal the user removed. The server rejects it ("Observation goal link is not confirmed"), and every save after that fails with 400. | **Fixed by the goal model change:** links are no longer stored, so the server's link checks are gone. Route test added. |
+| 2 | `web/src/ui/actions.ts` `done-step` | After a "Save words only" check-in, answering "Did you do your step?" sends `answer: 'text-only'`, which `/api/command` rejects. | **Fixed:** the option is removed. Old `text-only` check-ins become "Not sure" with the note kept, both on load and when an old page saves. |
+| 3 | `web/src/domain/health.ts` export parser | export.xml now keeps every HRV sample, workout and mindful session for the file's whole history. Years of Apple Watch data come to about 1 MB, over the 900 KB state limit, so every save fails with 413. | **Fixed:** the parser keeps HRV, workouts and mindful sessions for the last 60 days only (`DETAIL_DAYS`, the same window as the iOS app). Sleep and exercise totals are kept in full. |
+| 4 | `web/src/ui/store.ts` `refreshLinkedHealth` | Finishing an iOS link raises the server's revision number, but the browser copies the new number only when `adoptLinked` returns true. Otherwise every save fails with 409 until reload. The server also overwrites a newer import. | **Fixed:** the browser takes the server's newer revision every time. Link completion no longer replaces a newer non-simulated import. Route test added for the server side. |
+| 5 | `web/src/app/api/session/route.ts` | The old single-slot state is copied to `<sid>-legacy-demo`, and "Delete all records" never deletes that copy. | **Fixed:** deleting personal records also deletes the copy. Route test added. |
 
 ## iOS PoC / HRV compatibility
 
@@ -112,4 +112,9 @@ The user can no longer manually link a goal to an unrelated check-in (Ellie's ru
 
 Use **Goal / Check-in** (目標／每日記錄) in the UI and docs. "Concern" survives only as the wording of the onboarding question.
 
-**Needs Ellie's approval before the data model changes.**
+**Approved (2026-10-16), now in place:**
+
+- `profile.goals` is an ordered list of goal IDs (`GOAL_CATALOG` in `topics.ts`, one goal per onboarding concern). The first goal is the priority.
+- `profile.concerns`, `profile.goalId`, `goal.observationIds` and `observation.goalIds` are gone. `normalizeGoals` converts older records on load and on save.
+- Settings → Edit goals opens a goals sheet: add, remove or prioritise. A goal with no tracked check-in offers to add one. Today, Settings and the Agent profile fact all read `profile.goals`.
+- The check-in sheets show which goals a check-in suits (read-only). UI wording uses "check-in" instead of "observation". Code and data keep `observation`.

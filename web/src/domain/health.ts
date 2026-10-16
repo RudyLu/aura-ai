@@ -17,6 +17,7 @@ const EXERCISE = 'HKQuantityTypeIdentifierAppleExerciseTime';
 const HRV = 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN';
 const MINDFUL = 'HKCategoryTypeIdentifierMindfulSession';
 const FLOW = 'HKCategoryTypeIdentifierMenstrualFlow';
+export const DETAIL_DAYS = 60; // same window as the iOS app (AuraLink.days)
 const ASLEEP = /HKCategoryValueSleepAnalysisAsleep/; // Asleep, AsleepCore/Deep/REM/Unspecified; excludes InBed & Awake
 
 // ---------- sample (synthetic) ----------
@@ -159,6 +160,11 @@ export function createExportParser() {
       }
       for (const d of Object.keys(activity)) activity[d] = Math.round(activity[d]);
       const range: [string, string] | null = minDate && maxDate ? [minDate, maxDate] : null;
+      // Timestamped detail is large: keep the last DETAIL_DAYS days, as the iOS app sends.
+      if (maxDate) {
+        const from = addDays(maxDate, -(DETAIL_DAYS - 1));
+        for (const r of [hrvSamples, workouts, mindful]) for (const d of Object.keys(r)) if (d < from) delete r[d];
+      }
       return { sleep, activity, cycle: [...cycle].sort(), hrvSamples, workouts, mindful, timezone: offsets.size === 1 ? [...offsets][0] : 'mixed-offsets', records: count, range };
     }
   };

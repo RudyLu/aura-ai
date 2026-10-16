@@ -2309,3 +2309,10 @@ main.today.todayA { gap: 22px; }
 .healthpreference > div { flex: 1; }
 .healthpreference .iosswitch { width: 51px; height: 31px; min-width: 51px; }
 .syncscreen.hkscreen .hkapp .healthtile { margin: 0; }
+
+/* Goals: each goal card lists the suitable check-ins being tracked (worked out, not stored). */
+.goalcard small { display: block; margin-top: 4px; font-size: 12px; opacity: .65; }
+.setrow span small { display: block; font-size: 12px; opacity: .6; margin-top: 2px; }
+.goalfit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 16px 12px; font-size: 13px; }
+.goalfit b { font-weight: 600; }
+.goalfit small { opacity: .7; }

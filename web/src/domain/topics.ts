@@ -104,13 +104,6 @@ export const TOPICS: Record<TopicId, Topic> = {
 
 };
 
-export const GOALS = [
-  { id: 'evening-energy', label: 'More energy after work', topicId: 'evening-energy' },
-  { id: 'rested', label: 'Feel rested when I wake up', topicId: 'rested-waking' },
-  { id: 'afternoon', label: 'Stay awake in the afternoon', topicId: 'afternoon-sleepiness' },
-  { id: 'balance', label: 'Find balance on busy days', topicId: null }
-];
-
 // Setup question 1: what has been getting in the way lately (multi-select).
 // Each concern weights the observation topics it relates to.
 export const CONCERN_GROUPS: ConcernGroup[] = [
@@ -133,6 +126,17 @@ export const CONCERN_GROUPS: ConcernGroup[] = [
     { id: 'low-mood', goal: 'Lift your mood', label: 'Low mood', w: { 'evening-energy': 1 } }] }
 ];
 export const CONCERNS: Record<string, Concern & { group: string }> = Object.fromEntries(CONCERN_GROUPS.flatMap(g => g.items.map(i => [i.id, Object.assign({ group: g.id }, i)])));
+// Goals: what the user wants to improve. Each onboarding concern is one goal (same ID);
+// the concern label is only the wording used to pick it. Which check-ins suit a goal
+// comes from this fixed table (the concern weights), never from stored links.
+export interface Goal { id: string; label: string; problem: string; group: string; topics: TopicId[] }
+export const GOAL_CATALOG: Record<string, Goal> = Object.fromEntries(Object.values(CONCERNS).map(c => [c.id, {
+  id: c.id, label: c.goal, problem: c.label, group: c.group,
+  topics: (Object.entries(c.w) as [TopicId, number][]).filter(([, w]) => w > 0).sort((a, b) => b[1] - a[1]).map(([t]) => t)
+}]));
+export const GOAL_IDS = Object.keys(GOAL_CATALOG);
+export const isGoalId = (id: unknown): id is string => typeof id === 'string' && Object.hasOwn(GOAL_CATALOG, id);
+export const goalSuits = (goalId: string, topicId: TopicId) => !!GOAL_CATALOG[goalId]?.topics.includes(topicId);
 // Topics ordered by how well they match the chosen concerns, with the reasons.
 export function rankTopics(concernIds: string[] = []) {
   const ids = Object.keys(TOPICS) as TopicId[];

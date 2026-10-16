@@ -3,7 +3,7 @@ import { sessionId } from '@/server/session';
 import { deleteSession, loadHealthImport, loadState, mutateState } from '@/server/repo';
 import { geminiConfigured, MODEL } from '@/server/gemini';
 import { inputSignature, migrateState, modeOf, modeSid, StateSchema, validateRelations } from '@/server/statePolicy';
-import type { State } from '@/domain/state';
+import { normalizeGoals, type State } from '@/domain/state';
 
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
@@ -22,7 +22,10 @@ export async function PUT(req: Request) {
   try {
     const raw = await req.text();
     if (Buffer.byteLength(raw) > 900_000) return NextResponse.json({ error: 'Too many records to save.' }, { status: 413 });
-    const body = JSON.parse(raw), parsed = StateSchema.safeParse(body.state);
+    const body = JSON.parse(raw);
+    // A page loaded before the goal model change may still send links or words-only check-ins.
+    if (body.state && typeof body.state === 'object' && body.state.profile && Array.isArray(body.state.observations) && Array.isArray(body.state.checkins) && Array.isArray(body.state.feedbacks)) normalizeGoals(body.state);
+    const parsed = StateSchema.safeParse(body.state);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid records', issues: parsed.error.issues.slice(0,5) }, { status: 400 });
     const incoming = parsed.data as unknown as State; validateRelations(incoming);
     const before = await loadState(sid);
@@ -66,6 +69,9 @@ export async function PUT(req: Request) {
   }
 }
 export async function DELETE(req: Request) {
-  await deleteSession(modeSid(await sessionId(), req));
+  const visitor = await sessionId();
+  await deleteSession(modeSid(visitor, req));
+  // The backup of an old single-slot demo belongs to the personal records.
+  if (modeOf(req) === 'personal') await deleteSession(`${visitor}-legacy-demo`);
   return NextResponse.json({ ok: true });
 }

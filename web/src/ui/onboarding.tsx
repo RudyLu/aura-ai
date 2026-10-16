@@ -148,8 +148,8 @@ function TopicDeck({ o }: { o: OnboardingDraft }) {
     if (id && id !== o.topicId) { o.topicId = id as typeof o.topicId; o.time = null; render(); }
   };
   return (
-    <main className="topicdeck"><ObHead i={1} /><p className="decklabel">Your first observation</p>
-      <div className="deck" id="topic-deck" ref={deck} onScroll={onScroll} role="group" aria-roledescription="carousel" aria-label="Suggested observations">
+    <main className="topicdeck"><ObHead i={1} /><p className="decklabel">Your first daily check-in</p>
+      <div className="deck" id="topic-deck" ref={deck} onScroll={onScroll} role="group" aria-roledescription="carousel" aria-label="Suggested check-ins">
         {ranked.map((r, k) => {
           const tt = topic(r.id);
           const tag = k === 0 && r.score ? 'Best match' : r.score ? 'Also fits' : 'Another option';

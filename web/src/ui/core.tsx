@@ -146,7 +146,6 @@ export function ScalePreview({ topicId }: { topicId: string }) {
 export function checkinStatus(c: Checkin | null | undefined, topicId: string) {
   if (!c) return null;
   if (c.status === 'recorded') return `${c.score}/5 · ${topic(topicId).labels[(c.score || 1) - 1]}`;
-  if (c.status === 'text-only') return 'Words only';
   return c.status === 'unknown' ? 'Not sure' : 'Skipped';
 }
 export const SourceTag = ({ source }: { source?: string }) =>

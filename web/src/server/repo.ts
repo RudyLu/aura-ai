@@ -110,6 +110,13 @@ export async function getLink(token: string): Promise<HealthLink | null> {
   return readJson<HealthLink>(path.join(DATA, 'links', `${token}.json`));
 }
 
+// Link completion writes the phone's import into saved records unless they already hold a
+// newer one (an export.xml imported while the link was open), and advances the revision.
+function adoptLinkedImport(state: State, h: HealthImport) {
+  if (state.healthImport && state.healthImport.via !== 'simulated' && state.healthImport.importedAt > h.importedAt) return;
+  state.healthImport = h; if (state.onboarded) state.dataSource = 'apple-health'; state.inputRevision = (state.inputRevision || 0) + 1;
+}
+
 // Uses the token once: saves the import and marks the link done, only if it is still
 // pending and unexpired. Returns false otherwise.
 async function completeLinkUnlocked(token: string, h: HealthImport, now = Date.now()): Promise<boolean> {
@@ -123,7 +130,7 @@ async function completeLinkUnlocked(token: string, h: HealthImport, now = Date.n
       const stateRef = db.collection('sessions').doc(link.sid), doc = await tx.get(stateRef);
       if (doc.exists) {
         const state = migrateState(JSON.parse(doc.get('json')), link.sid.endsWith('-demo') ? 'demo' : 'personal');
-        state.healthImport = h; if (state.onboarded) state.dataSource = 'apple-health'; state.inputRevision = (state.inputRevision || 0) + 1;
+        adoptLinkedImport(state, h);
         tx.set(stateRef, {json:JSON.stringify(state),updatedAt:new Date(now)});
       }
       tx.set(db.collection('healthImports').doc(link.sid), { json: JSON.stringify(h), updatedAt: new Date(now) });
@@ -137,7 +144,7 @@ async function completeLinkUnlocked(token: string, h: HealthImport, now = Date.n
   await writeJson(path.join(DATA, 'health', `${link.sid}.json`), h);
   await mutateState(link.sid, raw => {
     const state = migrateState(raw,link.sid.endsWith('-demo') ? 'demo' : 'personal');
-    state.healthImport = h; if (state.onboarded) state.dataSource = 'apple-health'; state.inputRevision = (state.inputRevision || 0) + 1;
+    adoptLinkedImport(state, h);
     return {state,result:null};
   });
   await writeJson(file, { ...link, ...done });

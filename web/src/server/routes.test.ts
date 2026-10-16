@@ -72,8 +72,8 @@ describe('real file-backed routes and visitor/mode isolation',()=>{
     const s=buildDemo(10),p=s.plans[0];await repo.saveState(`${identity.sid}-demo`,s);
     const response=await reviews.POST(request('review',{planId:p.id,planVersion:1,inputRevision:0,requestId:'real-api-request',today:'2026-10-08'},'demo'));expect((await response.json()).status).toBe('not-integrated');expect((await repo.loadState(`${identity.sid}-demo`))!.aiReviews).toEqual([]);
   });
-  it('rejects invalid, mismatched and future record times, but words-only does not create a score',async()=>{
-    const s=blank(),o=addObservation(s,'stress');s.timezone='UTC';saveCheckin(s,{observationId:o.id,topicId:'stress',status:'text-only',score:null,note:'Busy and tense',occurredAt:'2026-10-01T20:00'});
+  it('rejects invalid, mismatched and future record times; a not-sure answer keeps its words without a score',async()=>{
+    const s=blank(),o=addObservation(s,'stress');s.timezone='UTC';saveCheckin(s,{observationId:o.id,topicId:'stress',status:'unknown',score:null,note:'Busy and tense',occurredAt:'2026-10-01T20:00'});
     const put=(state:typeof s)=>session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state})}));
     expect((await put(s)).status).toBe(200);s.inputRevision=1;s.checkins[0].occurredAt='2026-02-30T20:00';expect((await put(s)).status).toBe(400);
     s.checkins[0].occurredAt='2099-01-01T20:00';s.checkins[0].date='2099-01-01';expect((await put(s)).status).toBe(400);
@@ -99,4 +99,34 @@ describe('real file-backed routes and visitor/mode isolation',()=>{
     expect((await Promise.all([repo.completeLink(token,s.healthImport!),repo.completeLink(token,s.healthImport!)])).sort()).toEqual([false,true]);
   });
 
+  it('removing a goal keeps its check-ins and later saves succeed (no stored links to break)',async()=>{
+    const s=blank(),o=addObservation(s,'evening-energy');s.profile.goals=['drained','stressed'];
+    const put=(state:typeof s)=>session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state})}));
+    expect((await put(s)).status).toBe(200);
+    s.inputRevision=1;s.profile.goals=['stressed'];expect((await put(s)).status).toBe(200);
+    s.inputRevision=2;saveCheckin(s,{observationId:o.id,topicId:o.topicId,status:'recorded',score:3,occurredAt:'2026-10-01T21:00'});expect((await put(s)).status).toBe(200);
+    const saved=(await repo.loadState(identity.sid))!;expect(saved.profile.goals).toEqual(['stressed']);expect(saved.observations).toHaveLength(1);expect(saved.checkins).toHaveLength(1);
+    s.inputRevision=3;s.profile.goals=['not-a-goal'];expect((await put(s)).status).toBe(400);
+  });
+  it('a page from before the goal model can still save: links are dropped and words-only becomes not sure',async()=>{
+    const s=blank(),o=addObservation(s,'stress');s.timezone='UTC';
+    const legacy=JSON.parse(JSON.stringify(s));legacy.profile.goals=[{id:'stressed',label:'Feel less tense',observationIds:[o.id],priority:1}];legacy.profile.concerns=['stressed'];legacy.observations[0].goalIds=['stressed'];
+    legacy.checkins=[{id:'c1',observationId:o.id,topicId:'stress',source:'check-in',status:'text-only',score:null,note:'Tense',occurredAt:'2026-10-01T20:00',date:'2026-10-01',createdAt:'2026-10-01T20:00:00Z'}];
+    expect((await session.PUT(new Request('http://localhost/api/session',{method:'PUT',body:JSON.stringify({state:legacy})}))).status).toBe(200);
+    const saved=(await repo.loadState(identity.sid))! as unknown as Record<string,any>;
+    expect(saved.profile.goals).toEqual(['stressed']);expect(saved.profile.concerns).toBeUndefined();expect(saved.observations[0].goalIds).toBeUndefined();
+    expect(saved.checkins[0]).toMatchObject({status:'unknown',score:null,note:'Tense'});
+  });
+  it('deleting personal records also deletes the archived single-slot demo',async()=>{
+    await repo.saveState(identity.sid,buildDemo(4));await session.GET(request('session'));
+    expect(await repo.loadState(`${identity.sid}-legacy-demo`)).not.toBeNull();
+    await session.DELETE(request('session'));
+    expect(await repo.loadState(`${identity.sid}-legacy-demo`)).toBeNull();expect(await repo.loadState(identity.sid)).toBeNull();
+  });
+  it('a phone link does not replace a newer import already in the records',async()=>{
+    const s=blank();s.onboarded=true;s.dataSource='apple-health';s.healthImport={sleep:{'2026-10-01':7},activity:{},cycle:[],range:['2026-10-01','2026-10-01'],via:'export-xml',importedAt:'2099-01-01T00:00:00.000Z',records:1};await repo.saveState(identity.sid,s);
+    const token='older-link';await repo.createLink({token,sid:identity.sid,status:'pending',expiresAt:Date.now()+60000});
+    expect(await repo.completeLink(token,{...s.healthImport!,via:'ios-app',importedAt:new Date().toISOString()})).toBe(true);
+    expect((await repo.loadState(identity.sid))!.healthImport!.via).toBe('export-xml');
+  });
 });
