@@ -168,7 +168,7 @@ If evening walking does not fit a shift worker's or another user's routine, offe
 
 Implement the five lifestyle actions and retain all six recording/observation templates above. Synchronize the two discovery catalogs and the Agent/acceptance path; verify this checklist. This documentation change does not itself enable runtime actions.
 
-For the existing Discovery and mock-period scope, retain [PRD v0.3, section 3.1](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841) as the background reference; this specification does not introduce a separate analysis configuration.
+For the existing Discovery and mock-period scope, retain [PRD v0.3, section 3.1](prd-v0.3.md) as the background reference; this specification does not introduce a separate analysis configuration.
 
 ## Source links
 
