@@ -54,10 +54,11 @@ These are catalog/UI availability observations, not an end-to-end verification o
 **Try an earlier caffeine time**
 
 > If it fits your routine, try moving a usual late caffeinated drink earlier. Log when you have it and keep noticing how you feel. There is no need to increase your intake.
+>
 
 If a waking observation is active, add: “Continue recording how rested you feel after your main sleep.” Do not silently create a new observation.
 
-**Evidence:** NHLBI advises avoiding caffeine that may interfere with sleep. A randomized crossover trial examined dose and timing in 23 males and found different effects for 100 mg and 400 mg doses. This supports considering timing and dose, not universal noon/2-pm deadlines or a guarantee of better evening energy. Trial-specific doses and time intervals must not become individualized prescriptions. [NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits); [Gardiner et al. — Dose and timing effects of caffeine on subsequent sleep](https://pubmed.ncbi.nlm.nih.gov/39377163/).
+**Evidence:** NHLBI advises avoiding caffeine that may interfere with sleep. A randomized crossover trial examined dose and timing in 23 males and found different effects for 100 mg and 400 mg doses. This supports considering timing and dose, not universal noon/2-pm deadlines or a guarantee of better evening energy. Trial-specific doses and time intervals must not become individualized prescriptions. NHLBI — Healthy Sleep Habits; Gardiner et al. — Dose and timing effects of caffeine on subsequent sleep.
 
 **Product safety rules for both actions:** Do not recommend increased intake, compensatory concentrated consumption, abrupt total cessation, or changes conflicting with clinician guidance. Do not propose an arrangement that conflicts with disclosed work-safety needs. Personal records show associations, not that caffeine caused a feeling. Missing intake records remain unknown, not confirmed non-use.
 
@@ -70,8 +71,9 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Make room for a quieter bedtime routine**
 
 > Before your main sleep, choose a quiet activity that fits your routine, such as reading or relaxing away from bright screens. Keep noticing how rested you feel after waking.
+>
 
-**Evidence and limitations:** NHLBI supports quiet time before bed and relaxation practices. It does not establish “30 minutes earlier for three nights” as a validated treatment schedule. [NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits).
+**Evidence and limitations:** NHLBI supports quiet time before bed and relaxation practices. It does not establish “30 minutes earlier for three nights” as a validated treatment schedule. NHLBI — Healthy Sleep Habits.
 
 **Safety:** Do not reduce sleep opportunity, force earlier sleep, change medication, or claim to treat insomnia. The routine must not displace sleep or conflict with required duties or clinician guidance.
 
@@ -88,6 +90,7 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Try a short walk after work**
 
 > If walking feels comfortable and fits your day, try a short walk after work at your own pace. Choose a manageable length, and answer your evening-energy check-in as usual.
+>
 
 **Acceptance:** Offer when the user wants activity and reports feasibility. Do not infer feasibility from an activity record or recommend walking solely because an energy score is low.
 
@@ -100,12 +103,13 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Try a short, comfortable evening walk**
 
 > If it fits your routine, try a short evening walk at a comfortable pace without delaying your main sleep. After waking, record how rested you feel.
+>
 
 **Acceptance:** Offer when the stated conditions hold. If evening timing would delay sleep, do not offer that arrangement; discuss another feasible option or recording without silently changing the plan.
 
 ### Shared evidence and safety
 
-WHO recognizes walking as physical activity and supports doing some activity rather than none. This does not validate a ten-minute, three-days-per-week schedule as a way to improve a particular user's energy or restedness. [WHO — Physical activity](https://www.who.int/news-room/fact-sheets/detail/physical-activity).
+WHO recognizes walking as physical activity and supports doing some activity rather than none. This does not validate a ten-minute, three-days-per-week schedule as a way to improve a particular user's energy or restedness. WHO — Physical activity.
 
 Product rules: do not recommend walking against disclosed mobility/activity restrictions or in unsafe surroundings. Stop if activity causes discomfort or symptoms; preserve the existing safety response for concerning symptoms. Do not automatically increase duration, frequency, or intensity when the user reports no improvement. Ten minutes may be an adjustable plan option, not a requirement.
 
@@ -119,7 +123,7 @@ Recording is a meaningful next step in its own right. Connect it to a relevant g
 - **Keep noticing [topic]:** “Answer your [check-in name] when it fits, or skip.” Render the actual topic and check-in name.
 - **Tonight's check-in:** Keep the existing evening-energy wording and explicit skip choice.
 
-NICE supports goals/planning and self-monitoring as behavior-change techniques. It does not validate Aura's exact frequency or guarantee a health benefit from journaling. [NICE PH49, Recommendation 7](https://www.nice.org.uk/Guidance/PH49/chapter/recommendations).
+NICE supports goals/planning and self-monitoring as behavior-change techniques. It does not validate Aura's exact frequency or guarantee a health benefit from journaling. NICE PH49, Recommendation 7.
 
 Acceptance: skipping does not create an answer or completed action; observe-only does not change the user's routine. Offer pause/adjust controls only where implemented, and never claim an unsupported change was saved.
 
@@ -137,6 +141,14 @@ These are product selection rules informed by the cited sources, not a clinicall
 8. Plan review addresses observations, feasibility, and user feedback. No improvement does not establish failure and must not trigger automatic escalation.
 9. Mark synthetic history clearly; describe its findings as demo-scenario observations. Keep period dates as background context only, with no period-derived actions.
 10. Apply the same eligibility and safety rules in Discovery, Agent suggestions, and plan acceptance. Recheck relevant conditions at acceptance so stale drafts cannot bypass them.
+
+### Concrete arrangements and plan dates
+
+Before acceptance, confirm the specific drink/timing, quiet activity, or walk timing/length the user will try. This arrangement defines Done / Partly done / Not done; record perceived change separately. Not doing the action is not a worse feeling score.
+
+New demo plans default to seven days unless another supported duration is user-confirmed. Show and save start and Review dates; seven days does not require daily execution. Existing Day 10 plans keep their original dates and feedback. Reopening the app, viewing Review, or updating wording must not restart them. A confirmed adjustment creates a new version while preserving prior history.
+
+If evening walking does not fit a shift worker's or another user's routine, offer another eligible option, relevant observation, or no action. Do not silently rename/reschedule the action; a changed arrangement needs confirmation and its own eligibility checks.
 
 ## 6. Acceptance checklist
 
@@ -160,4 +172,11 @@ These are product selection rules informed by the cited sources, not a clinicall
 
 Implement the five lifestyle actions and retain all six recording/observation templates above. Synchronize the two discovery catalogs and the Agent/acceptance path; verify this checklist. This documentation change does not itself enable runtime actions.
 
-For the existing Discovery and mock-period scope, retain [PRD v0.3, section 3.1](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841) as the background reference; this specification does not introduce a separate analysis configuration.
+For the existing Discovery and mock-period scope, retain PRD v0.3, section 3.1 as the background reference; this specification does not introduce a separate analysis configuration.
+
+## Source links
+
+- [NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
+- [Gardiner et al. — Dose and timing effects of caffeine on subsequent sleep](https://pubmed.ncbi.nlm.nih.gov/39377163/)
+- [WHO — Physical activity](https://www.who.int/news-room/fact-sheets/detail/physical-activity)
+- [NICE PH49 — Recommendation 7](https://www.nice.org.uk/guidance/ph49/chapter/1-recommendations)
