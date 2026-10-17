@@ -54,7 +54,6 @@ These are catalog/UI availability observations, not an end-to-end verification o
 **Try an earlier caffeine time**
 
 > If it fits your routine, try moving a usual late caffeinated drink earlier. Log when you have it and keep noticing how you feel. There is no need to increase your intake.
->
 
 If a waking observation is active, add: “Continue recording how rested you feel after your main sleep.” Do not silently create a new observation.
 
@@ -71,7 +70,6 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Make room for a quieter bedtime routine**
 
 > Before your main sleep, choose a quiet activity that fits your routine, such as reading or relaxing away from bright screens. Keep noticing how rested you feel after waking.
->
 
 **Evidence and limitations:** NHLBI supports quiet time before bed and relaxation practices. It does not establish “30 minutes earlier for three nights” as a validated treatment schedule. NHLBI — Healthy Sleep Habits.
 
@@ -90,7 +88,6 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Try a short walk after work**
 
 > If walking feels comfortable and fits your day, try a short walk after work at your own pace. Choose a manageable length, and answer your evening-energy check-in as usual.
->
 
 **Acceptance:** Offer when the user wants activity and reports feasibility. Do not infer feasibility from an activity record or recommend walking solely because an energy score is low.
 
@@ -103,7 +100,6 @@ If a waking observation is active, add: “Continue recording how rested you fee
 **Try a short, comfortable evening walk**
 
 > If it fits your routine, try a short evening walk at a comfortable pace without delaying your main sleep. After waking, record how rested you feel.
->
 
 **Acceptance:** Offer when the stated conditions hold. If evening timing would delay sleep, do not offer that arrangement; discuss another feasible option or recording without silently changing the plan.
 
@@ -172,7 +168,7 @@ If evening walking does not fit a shift worker's or another user's routine, offe
 
 Implement the five lifestyle actions and retain all six recording/observation templates above. Synchronize the two discovery catalogs and the Agent/acceptance path; verify this checklist. This documentation change does not itself enable runtime actions.
 
-For the existing Discovery and mock-period scope, retain PRD v0.3, section 3.1 as the background reference; this specification does not introduce a separate analysis configuration.
+For the existing Discovery and mock-period scope, retain [PRD v0.3, section 3.1](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841) as the background reference; this specification does not introduce a separate analysis configuration.
 
 ## Source links
 

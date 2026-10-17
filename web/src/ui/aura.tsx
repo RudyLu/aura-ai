@@ -109,6 +109,11 @@ function ReplyText({ text, animate, onRevealing }: { text: string; animate: bool
     const frame = requestAnimationFrame(() => scrollAuraToLatest(false));
     return () => cancelAnimationFrame(frame);
   }, [count, animate, revealing, onRevealing]);
+  // Release the parent's reveal lock if this reply stops animating mid-reveal or unmounts.
+  useLayoutEffect(() => {
+    if (!animate) return;
+    return () => onRevealing(false);
+  }, [animate, onRevealing]);
   useEffect(() => {
     if (!revealing) return;
     const timer = setTimeout(() => setCount(n => n + 1), Math.min(1100, Math.max(650, parts[count - 1].length * 9)));
