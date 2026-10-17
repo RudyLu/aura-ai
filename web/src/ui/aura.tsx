@@ -128,6 +128,8 @@ export function Aura() {
   const [attach, setAttach] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const initialMessages = useRef(s.messages.length);
+  const hero = !s.messages.length && !currentPlans(s).length;
+  // Re-attach when the hero view gives way to the conversation, which mounts these nodes.
   useLayoutEffect(() => {
     const viewport = document.querySelector('.chatbody');
     const content = document.querySelector('.convo');
@@ -137,11 +139,10 @@ export function Aura() {
     observer.observe(content); observer.observe(dock);
     scrollAuraToLatest(false);
     return () => observer.disconnect();
-  }, []);
+  }, [hero]);
   useLayoutEffect(() => {
     if (!ui.modal) scrollAuraToLatest(false);
   }, [s.messages.length, ui.pending, ui.modal, revealing]);
-  const hero = !s.messages.length && !currentPlans(s).length;
   const heroOrbRect = useRef<DOMRect | null>(null);
   useLayoutEffect(() => {
     if (hero) {

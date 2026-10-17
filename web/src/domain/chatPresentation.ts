@@ -3,7 +3,7 @@ import { goalsForTopic, type Message, type Plan, type State } from './state';
 
 // Preserve sentence punctuation and paragraph boundaries, including decimal numbers/times.
 export function replySegments(text: string): string[] {
-  return text.split(/\n+|(?<=[.!?])\s+(?=[A-Z“‘])/u).map(part => part.trim()).filter(Boolean);
+  return text.split(/\n+|(?<!\b(?:Dr|Mr|Mrs|Ms|vs|e\.g|i\.e)\.)(?<=[.!?])\s+(?=[A-Z“‘])/u).map(part => part.trim()).filter(Boolean);
 }
 
 // A factual acknowledgement of a successfully saved command, never a generated claim.

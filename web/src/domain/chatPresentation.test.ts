@@ -7,6 +7,9 @@ describe('chat presentation', () => {
     const text = 'Your score was 3.2. Move the 8 pm drink to 6 pm.\nDoes that fit your day?';
     expect(replySegments(text)).toEqual(['Your score was 3.2.', 'Move the 8 pm drink to 6 pm.', 'Does that fit your day?']);
   });
+  it('does not split after common abbreviations', () => {
+    expect(replySegments('Dr. Lee suggested tea, e.g. Chamomile. Try it tonight.')).toEqual(['Dr. Lee suggested tea, e.g. Chamomile.', 'Try it tonight.']);
+  });
   it('acknowledges saved dates and the linked goal without promising a benefit', () => {
     const s = buildDemo(10), p = s.plans.find(p=>p.topicId==='rested-waking')!;
     p.start='2026-10-17'; p.review='2026-10-23';
