@@ -32,6 +32,10 @@ describe('context the model receives', () => {
   it('treats unlogged caffeine as unknown, not none (M09)', () => {
     expect(buildFacts(blank(), today).facts.find(f => f.id === 'rec:week')!.text).toMatch(/not logged \(unknown/);
   });
+  it('marks demo records as synthetic, and only in demo', () => {
+    expect(buildFacts(demo(), today).facts.find(f => f.id === 'demo')!.text).toMatch(/synthetic demo history/);
+    expect(buildFacts(blank(), today).facts.some(f => f.id === 'demo')).toBe(false);
+  });
   it('labels evidence types', () => {
     const types = new Set(buildFacts(demo(), today).facts.map(f => f.type));
     expect([...types]).toEqual(expect.arrayContaining(['user_report', 'verified_summary', 'context']));

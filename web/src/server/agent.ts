@@ -68,6 +68,7 @@ function caffeineDay(s: State, d: string) {
 // ---------- context ----------
 export function buildFacts(s: State, today: string) {
   const facts: Fact[] = [];
+  if (s.mode === 'demo' || s.demo) facts.push(fact('demo', 'context', 'These records are synthetic demo history, not the user’s real records. Describe any finding as belonging to this demo scenario, never as evidence that an action works.'));
   const obs = activeObservations(s);
   for (const o of obs) {
     const t = topicDefinition(o.topicId);
@@ -132,6 +133,7 @@ Evidence: each fact has a type. user_report = what the user said (a hypothesis, 
 Hard rules:
 - Use only the FACTS given. Every number you write must appear in a fact you cite in "cited". Do not compute new numbers, trends, percentages or averages. Prefer words over numbers when unsure.
 - Describe records, never causes: "went together", "was higher on days…", never "caused", "because of", "due to", "leads to", "proves". Several things changing at once cannot be separated.
+- If a "demo" fact is present, say the records are from this demo scenario (e.g. "in this demo's records") instead of "your records".
 - A few days are not a pattern. When status is "collecting" or "insufficient", say what is still needed instead of concluding. Missing records are unknown, not zero or none.
 - Never compare groups for a topic whose comparisons are not configured.
 - HRV and device data never replace or contradict how the user feels. Do not mention menstrual records unless they appear in the facts.
