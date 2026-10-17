@@ -526,11 +526,12 @@ export function dispatch(a: string, v: string | undefined, d: ActData, el?: HTML
       const reviewId = ui.m.aiReviewId, requestId = ui.m.requestId;
       const source = reviewId ? s.aiReviews?.find(r => r.id === reviewId) : null;
       const step = draft.kind === 'observe' ? draft.step : val('plan-step');
+      const prevFresh = ui.freshMsg;
       ui.saving = true; ui.freshMsg = s.messages.length + 1; render();
       command('accept', { stepId: draft.stepId, topicId: draft.topicId, observationId: target, step, start: val('plan-start'), review: val('plan-review'), aiReviewId: reviewId, requestId, planId: source?.planId }).then(() => {
         ui.freshMsg = S().messages.length;
         ui.draft = null; const lastGuide = S().messages.findLast(m=>m.role==='guide'); if(lastGuide) lastGuide.draft=null; save(); close(); ui.page = 'app'; ui.tab = 'aura'; toast('Step saved');
-      }).catch(e => err(e.message)).finally(() => { ui.saving = false; render(); revealLatestAuraMessage(); }); return;
+      }).catch(e => { ui.freshMsg = prevFresh; err(e.message); }).finally(() => { ui.saving = false; render(); revealLatestAuraMessage(); }); return;
     }
 
     case 'feedback': {
