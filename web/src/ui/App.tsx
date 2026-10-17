@@ -33,7 +33,7 @@ export default function App() {
           <nav aria-label="Main navigation">
             {([['today', 'Today'], ['explore', 'Explore'], ['aura', 'Aura']] as const).map(([id, t]) => (
               <button key={id} type="button" className={ui.tab === id ? 'current' : ''} aria-current={ui.tab === id ? 'page' : undefined} onClick={e => dispatch('tab', id, {}, e.currentTarget)}>
-                {id === 'aura' ? <img className="nav-aura" src="/assets/brand/aura-heart-mark-v1.png" width={20} height={20} alt="" aria-hidden="true" draggable={false} /> : null}{t}
+                {id === 'aura' ? <img className="nav-aura" src="/assets/brand/aura-heart-mark-v1-160.png" width={20} height={20} alt="" aria-hidden="true" draggable={false} /> : null}{t}
               </button>
             ))}
           </nav>

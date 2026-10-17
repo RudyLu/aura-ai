@@ -7,7 +7,13 @@ The approved heart concept replaces the visual orb in the shared Aura mark, navi
 - `public/assets/brand/aura-heart-companion-v1.png`: dimensional companion used for large Aura marks.
 - `public/assets/brand/aura-heart-mark-v1.png`: simplified mark used at small sizes and for the browser icon.
 
-Both PNGs have transparent backgrounds. Existing wrapper sizes and Aura animation states are retained, including the transition from the hero to the small conversation mark. Original orb assets remain available for rollback.
+Both PNGs have transparent backgrounds and are the 1254px masters; the app does not load them. It serves resized exports instead (made with `sips -Z`):
+
+- `aura-heart-companion-v1-320.png` (about 130 KB): hero mark, drawn at up to 150px.
+- `aura-heart-mark-v1-160.png` (about 21 KB): small marks, the navigation icon and the Apple Health tile, drawn at up to 78px.
+- `aura-heart-mark-v1-64.png` (about 5 KB): browser icon.
+
+Existing wrapper sizes and Aura animation states are retained. In the transition from the hero to the small conversation mark, the top mark starts with the companion artwork over it and cross-fades to the mark as it moves, so the artwork does not swap suddenly. Original orb assets remain available for rollback.
 
 ## Provenance
 

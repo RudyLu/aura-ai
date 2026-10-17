@@ -113,7 +113,9 @@ export function Aura() {
       { transform: `translate(${x}px, ${y}px) scale(${from.width / to.width})`, opacity: 1 },
       { transform: 'translate(0, 0) scale(1)', opacity: .9 }
     ], { duration: 700, easing: 'cubic-bezier(.22, 1, .36, 1)' });
-    return () => animation.cancel();
+    // The hero shows the companion artwork; cross-fade it into the small mark while it moves.
+    const fade = orb.querySelector('.aura-heart-handover')?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, easing: 'ease-in' });
+    return () => { animation.cancel(); fade?.cancel(); };
   }, [hero]);
   useEffect(() => {
     const page=document.querySelector('.chatpage');
