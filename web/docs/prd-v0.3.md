@@ -1,14 +1,14 @@
 # Aura — Product Requirements Document v0.3
 
 - Source: [PRD v0.3 in Notion](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841)
-- Source last edited: October 16, 2026
+- Source last edited: October 17, 2026
 - Synced to this repository: October 17, 2026 (Asia/Taipei)
 
-This file is a snapshot of the source PRD. Implementation status and subsequent proposals must be confirmed separately. Linked specification appendices and the Notion change log remain external references; their contents are not copied into this file.
+This file mirrors the source PRD, including the October 17 confirmed action decisions. Implementation and release-review status require separate evidence. Linked specification appendices and the Notion change log remain external references; their contents are not copied into this file.
 
 ---
 
-Product Requirements Document (PRD) v0.3 · Updated: 2026-10-16
+Product Requirements Document (PRD) v0.3 · Updated: 2026-10-17
 
 [Aura — Topic Behavior Definitions](https://app.notion.com/p/3f2cf214d45e81fc8c75c85102f8fe21)
 [Aura — Gemini Implementation Prompt](https://app.notion.com/p/3f2cf214d45e819781fdf6280dd0de17)
@@ -183,7 +183,7 @@ Acceptance for option B must cover different expressions mapping to one template
 <td>rested-waking</td>
 <td>Feel rested after waking from the main sleep period.</td>
 <td>Higher = more rested</td>
-<td>04:00–12:00 / 08:00; approximately within one hour of waking</td>
+<td>After waking from the main sleep; 08:00 is a configurable demo reminder, not a required one-hour completion deadline.</td>
 </tr>
 <tr>
 <td>afternoon-sleepiness</td>
@@ -362,11 +362,28 @@ These examples draw on [NHS headaches](https://www.nhs.uk/symptoms/headaches/), 
 > What you’ve described may require immediate medical attention. This app cannot determine the cause. Contact your local emergency services or go to an emergency department now. Do not wait for the app’s analysis.
 **General explanation:**
 > This app helps you record and understand patterns in your daily life. It does not provide diagnosis or treatment and is not a real-time medical monitoring service. If symptoms persist, worsen, or concern you, seek medical advice.
-- **Demo release gate:** Test explicit warnings, colloquial paraphrases, negated/past events, medication-change requests, worsening and model failures. Warnings must not enter ordinary advice or be bypassed by a prompt. Assign a content reviewer to confirm scope and wording; until complete, disable health-step generation and retain recording/display only. A disclaimer is not a substitute.
-### 3.3.1 Mock-demo action categories and evidence
-Refer to [Aura Mock Demo — Action Categories and Evidence](https://github.com/RudyLu/aura-ai/blob/ellie/aura-v2/web/docs/mock-demo-actions-and-evidence.md) (`web/docs/mock-demo-actions-and-evidence.md`, feature branch `ellie/aura-v2`).
-The reference maps the existing prototype actions to four categories: caffeine timing, sleep routine, everyday physical activity, and recording/self-monitoring. It includes NIH/NHLBI, caffeine-study, WHO and NICE sources, proposed English action wording and engineering notes.
-Use it to reconcile the current action catalog and review proposed wording. References support the general rationale, not every exact time, duration, frequency or outcome. This document is a content-review proposal, not approval to enable pending lifestyle actions. The safety and approval requirements in §3.3 and confirmed demo scope in §3.1 still apply.
+- **Demo release gate:** Product scope and wording are confirmed in §3.3.1. Before enabling each lifestyle action, record a named content review of its health scope, eligibility, exclusions and stopping conditions, and verify server-side whitelist enforcement, user confirmation and safety blocking. Product confirmation is not professional health-content review, and RD implementation is not such review. Test explicit warnings, paraphrases, negated/past events, medication requests, worsening and model failures. Enable only actions that pass their applicable review and release checks; keep an affected action disabled with recording/observation alternatives if checks are incomplete. Do not blanket-disable already cleared actions merely because another category is pending. A disclaimer is not a substitute.
+### 3.3.1 Mock-demo actions — product decision, October 17, 2026
+**Product scope and copy are confirmed:** Support reviewer exploration of all three lifestyle categories below, not only the scripted demo. These decisions supersede the earlier proposal-only description. They specify intended behavior, not verified deployment or professional health-content approval. Release checks in §3.3 remain mandatory for each action.
+The main story remains energy after work, with sleep, caffeine and overtime context: clarify evidence and uncertainty → choose a feasible next step → capture execution, feelings and barriers separately → review and continue the user's choices.
+**Fixed lifestyle action content**
+- **Caffeine timing — “Try an earlier caffeine time”:** “If it fits your routine, move your usual late caffeinated drink earlier. Record the time and continue your sleep-related check-in.” Offer when the user wants to explore late caffeine and sleep, using rested-waking as the primary supported observation. Do not prescribe a universal noon/2 pm cutoff, increase intake, or claim this improves evening energy. An energy/caffeine group difference alone is not an eligibility trigger.
+- **Sleep routine — “Make room for a quieter bedtime routine”:** “Choose a quiet activity before your planned bedtime, such as reading or relaxing without bright screens. Continue recording how rested you feel after waking.” Use for a relevant sleep/restedness goal and bedtime context; do not reduce sleep, force an earlier bedtime or claim insomnia treatment.
+- **Everyday activity — “Try a short, comfortable walk”:** “If walking is suitable for you and fits your schedule, try a short walk at a comfortable pace. Continue your usual check-in and note how you feel.” Offer only when the user wants an activity-related next step and can comfortably participate. Do not present walking as a proven remedy for evening fatigue or next-morning restedness, or automatically increase intensity after no improvement.
+**Recording and observation alternatives**
+- “Notice your caffeine routine”: record caffeinated drinks and their times without changing usual intake.
+- “Check in after waking”: record how rested the user feels after their main sleep.
+- “Keep it manageable this week”: choose an available day for a check-in; skipping and returning later are allowed.
+- Retain the existing observation after already-planned activity; do not turn it into a new exercise instruction.
+- Retain “Answer tonight's check-in, or skip it” and “Keep noticing \[topic\]”. Include both in the action inventory.
+**Plan timing and user control**
+Seven days is a demo plan setting, not a validated treatment or effectiveness threshold. Use “After your main sleep, for 7 days” instead of “Each morning for 7 days”; replace “within an hour of waking” with “after waking from your main sleep”. Do not impose the old fixed noon/2 pm, 30-minute/three-night or walking-frequency prescriptions through other templates.
+The Agent selects only fixed eligible action IDs and cannot invent instructions, intensify a plan or force an action for every goal. Offer recording, observation, declining or deferring as valid alternatives. Require confirmation before starting or changing a plan. Preserve safety blocking, prior choices, barriers, feedback and plan versions.
+**Synthetic evidence and Review**
+Use “in this demo scenario” when discussing synthetic findings in cards, chat and Review. Show analysis dates, group counts and missingness. The caffeine comparison may say: “In this demo scenario, average recorded energy scores were higher on days with caffeine logged before the check-in than on days confirmed to have no caffeine before it. This does not show that caffeine caused the difference.” Only use this statement when the actual direction and explicit coverage support it; otherwise report the actual result or insufficient data. Unknown intake must not enter the no-caffeine group.
+Neither this comparison nor a Day 10 before/after review proves an action worked. General guidance supplies the action rationale; personal records and stated constraints help choose a relevant direction. Keep execution, perceived change and barriers separate.
+**Evidence and inventory**
+See [Aura Mock Demo — Action Categories and Evidence](https://github.com/RudyLu/aura-ai/blob/ellie/aura-v2/web/docs/mock-demo-actions-and-evidence.md) for NIH/NHLBI, caffeine-study, WHO and NICE references. Their support does not extend to every dose, clock time, duration or outcome. Maintain a complete inventory distinguishing product-confirmed content, release-review status, implemented availability and verified deployment. Documentation edits do not switch production actions on.
 ## 4. Data and technical design — existing deployment and integration requirements
 A Gemini-enabled Cloud Run version exists; ZIP (7) is a separate frontend integration reference. Platform selection has started, but complete data/permission/model contracts and parity remain unverified.
 Flow: connect/import/photo/check-in → normalize and obtain user confirmation → personal timeline → analysis → Gemini explanation and next step → save feedback → reanalyze.
@@ -539,7 +556,9 @@ Use clearly labelled mock/synthetic historical cases for the judging flow. New l
 - [ ] Gemini, demo photo-upload and demo-data operation failures are understandable and retryable; do not fabricate success. External health-device failure testing is outside this acceptance scope.
 - [ ] Isolate user data; keep credentials and private health records out of the repository.
 - [ ] The demo is resettable, and unfamiliar visitors can complete its main interactions.
-- [ ] English safety messages and tests for warnings, paraphrases, negation, medication changes, worsening and service failure pass. Complete content review or disable health-step generation.
+- [ ] English safety tests cover warnings, paraphrases, negation, medication changes, worsening and service failure. Each enabled lifestyle action passes the recorded content-review and release checks in §3.3; uncleared actions remain unavailable.
+- [ ] Reviewer exploration covers the three product-confirmed lifestyle categories in §3.3.1 where cleared and eligible, plus all recording/observation alternatives. Verify topic/context eligibility, fixed copy, confirmation, refusal, no invented/intensified instructions, and continued choices after barriers or Review.
+- [ ] Synthetic findings, chat and Review explicitly identify the demo scenario. Caffeine groups use confirmed coverage; analysis ranges/counts are visible, and neither comparisons nor Day 10 imply causation or proven action effectiveness. Seven-day plans are product settings; waking check-ins do not require completion within one hour.
 - [ ] Concurrent isolated sessions and resets do not affect other visitors.
 - [ ] Mapping failure and mock cases with insufficient comparison data still support understandable recording and missing-data flows.
 - [ ] Confirm contracts/examples used by the demo and trace synthetic history separately from demo-live inputs; neither may leak into personal records.
@@ -561,8 +580,8 @@ The following four specification appendices define product/AI behavior and engin
 - [Aura — Topic Behavior Definitions](https://app.notion.com/p/3f2cf214d45e81fc8c75c85102f8fe21): Product behavior, five topics and data relationships, v1.2.
 - [Aura — Gemini Implementation Prompt](https://app.notion.com/p/3f2cf214d45e819781fdf6280dd0de17): Engineering/coding-agent implementation and acceptance instructions, v1.2; not a document to paste wholesale into a runtime system prompt.
 - [Aura — Multifactor Understanding and Response Policy](https://app.notion.com/p/3f2cf214d45e81208829c7bbc29813f4): Multifactor responses, evidence levels, context and M01–M14, v1.0.
-Do not silently merge conflicting requirements. This PRD and the latest HRV specification supersede old HRV stress descriptions. The October 16 demo Discovery decision is in §3.1; the historical alternative in §3.1.1 is not adopted for this demo. Medical safety rules and the intervention whitelist still require an assigned reviewer; until approved, retain recording/display only. The mock-data/threshold decision does not approve health actions.
-- Action-content reference: [Aura Mock Demo — Action Categories and Evidence](https://github.com/RudyLu/aura-ai/blob/ellie/aura-v2/web/docs/mock-demo-actions-and-evidence.md). Category-to-evidence mapping, proposed English copy and RD notes for the current mock demo; a proposal for review, not an approved health-action whitelist.
+Do not silently merge conflicting requirements. This PRD and the latest HRV specification supersede old HRV stress descriptions. The October 16 demo Discovery decision is in §3.1; the historical alternative in §3.1.1 is not adopted. The October 17 product-confirmed action scope and copy are in §3.3.1, subject to the per-action release checks in §3.3; these decisions do not constitute professional health-content approval.
+- Action-content reference: [Aura Mock Demo — Action Categories and Evidence](https://github.com/RudyLu/aura-ai/blob/ellie/aura-v2/web/docs/mock-demo-actions-and-evidence.md). Sources and implementation inventory supporting the confirmed action content in §3.3.1; record release review and actual availability separately.
 - Product discussions: Ellie confirmed the original vision, Agent loop, multiple concurrent concerns, food-photo extraction, multi-device direction and period-date recording.
 - Official email supplied by Ellie: Teams of 2–4, submission access after registration, five deliverables and dashboard-specific rules.
 - [Official public website](https://aibuildercup.com/), consulted September 30, 2026: Prototype deadline October 18, team registration deadline October 11 and a working Google Cloud prototype. Dashboard rules take precedence for details.

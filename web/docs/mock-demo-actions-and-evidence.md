@@ -1,14 +1,16 @@
 # Aura Mock Demo — Action Categories and Evidence
 
-Updated: October 16, 2026
+Updated: October 17, 2026
 
-**Purpose:** Map the prototype's existing actions to credible guidance and provide source-informed wording for RD review. This is a proposed content revision, not approval to enable pending actions.
+**Purpose:** Document the product-confirmed action categories and copy for reviewer exploration, with supporting evidence. Product scope and wording were confirmed on October 17, 2026. Professional health-content review and verified production availability are separate from this product decision; apply the per-action release checks in PRD §3.3.
+
+**Availability reported by Rudy:** Lifestyle actions were disabled and recording/check-in actions were enabled at his production review. This document does not establish that deployment has changed.
 
 **Implementation reference:** The current-action inventory below reflects the frontend handoff baseline. Reconcile it with Rudy's latest implementation before making changes. This document does not claim that the proposed wording is implemented.
 
 ## 1. Caffeine Timing
 
-### Current actions
+### Earlier action labels — not the confirmed replacement copy
 
 - Last coffee before noon.
 - No caffeine after 2 pm.
@@ -20,7 +22,7 @@ Updated: October 16, 2026
 - [NIH/NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
 - [Dose and Timing Effects of Caffeine on Subsequent Sleep — randomized crossover trial](https://pubmed.ncbi.nlm.nih.gov/39377163/)
 
-### Proposed action
+### Product-confirmed action
 
 **Try an earlier caffeine time**
 
@@ -34,7 +36,7 @@ Updated: October 16, 2026
 
 ## 2. Sleep Routine
 
-### Current action
+### Earlier action label — not the confirmed replacement copy
 
 - Wind down 30 minutes earlier for three nights.
 
@@ -44,7 +46,7 @@ Updated: October 16, 2026
 
 - [NIH/NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
 
-### Proposed action
+### Product-confirmed action
 
 **Make room for a quieter bedtime routine**
 
@@ -52,13 +54,13 @@ Updated: October 16, 2026
 
 ### RD notes
 
-- If retaining the existing 30-minute, three-night schedule, label it as a demo plan setting—not a proven treatment duration.
+- Use the confirmed flexible wording above; do not carry over the earlier mandatory 30-minute, three-night prescription.
 - Do not instruct users to reduce sleep or force an earlier bedtime.
 - Do not claim the action treats insomnia.
 
 ## 3. Physical Activity
 
-### Current actions
+### Earlier action labels — not the confirmed replacement copy
 
 - A 10-minute walk after work.
 - A 10-minute evening walk.
@@ -69,7 +71,7 @@ Updated: October 16, 2026
 
 - [WHO — Physical Activity](https://www.who.int/news-room/fact-sheets/detail/physical-activity)
 
-### Proposed action
+### Product-confirmed action
 
 **Try a short, comfortable walk**
 
@@ -77,16 +79,18 @@ Updated: October 16, 2026
 
 ### RD notes
 
-- The existing 10-minute, three-days-per-week schedule may remain a proposed demo setting, subject to content approval.
+- Use the confirmed short, comfortable walk wording; do not enforce the earlier 10-minute, three-days-per-week prescription.
 - Keep after-work and evening timing tied to the selected scenario; do not assume they produce the same outcome.
 - Do not automatically increase duration or intensity when feedback shows no improvement.
 
 ## 4. Recording and Self-Monitoring
 
-### Current actions
+### Recording and observation inventory
 
 - Record caffeinated drinks and their times.
 - Complete a waking or evening check-in.
+- Answer tonight’s check-in, or skip it.
+- Keep noticing [topic].
 - Notice feelings after already-planned activity.
 - Reduce recording frequency during a busy week.
 
@@ -96,7 +100,7 @@ Updated: October 16, 2026
 
 - [NICE PH49 — Behaviour Change: Individual Approaches](https://www.nice.org.uk/guidance/ph49/chapter/1-Recom-)
 
-### Suggested copy
+### Product-confirmed copy
 
 **Notice your caffeine routine**
 
@@ -126,8 +130,14 @@ Updated: October 16, 2026
 - Preserve existing safety blocking and PRD approval requirements. Source references alone do not approve an action.
 - Period dates remain background context only; do not generate period-derived actions.
 
-## Requested RD Outcome
+## Implementation and release requirements
 
-Reconcile these categories with the latest action catalog, identify the copy changes required, and confirm the small subset proposed for demo approval. No new action category or content-management system is required.
+- Prepare all three lifestyle categories for eligible reviewer exploration, not only the scripted demo. Product scope and wording are confirmed; record per-action content review, safety checks and actual deployment availability separately.
+- For caffeine timing, use a relevant sleep/rested-waking context. An evening-energy/caffeine group difference alone must not trigger the action. Do not increase intake or prescribe a universal clock cutoff.
+- Keep all recording alternatives, including activity already planned, optional check-ins, and “Keep noticing [topic]”. Do not force lifestyle steps for every goal.
+- Seven days is a demo plan setting, not an effectiveness threshold. Use “After your main sleep, for 7 days”; replace “within an hour of waking” with “after waking from your main sleep”.
+- Say “in this demo scenario” in synthetic findings, chat and Review. Show the actual analysis date range, group counts and missingness. Never treat absent caffeine logs as confirmed no intake or use a group difference as proof of causation.
+- Preserve user confirmation, safety blocking, refusals, constraints, feedback and prior plan versions. If an action does not pass its release checks, leave that action unavailable and offer recording/observation; another cleared category need not remain disabled.
+- RD verifies current action IDs and deployed copy against this inventory. No new category or content-management system is required.
 
 For the confirmed Discovery and mock-period scope, refer to [PRD v0.3, §3.1](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841). This document does not introduce a separate analysis configuration.
