@@ -2,11 +2,11 @@
 
 Updated: October 17, 2026
 
-**Purpose:** Document the product-confirmed action categories and copy for reviewer exploration, with supporting evidence. Product scope and wording were confirmed on October 17, 2026. Professional health-content review and verified production availability are separate from this product decision; apply the per-action release checks in PRD §3.3.
+**Purpose:** Document the product-confirmed action categories and copy for reviewer exploration, with supporting evidence. Product scope and wording were confirmed on October 17, 2026. Activation depends on traceable source evidence, fixed eligibility/limitations and passing engineering checks in PRD §3.3. No named professional health-content reviewer or external sign-off is required for this mock demo; do not claim clinical validation.
 
 **Availability reported by Rudy:** Lifestyle actions were disabled and recording/check-in actions were enabled at his production review. This document does not establish that deployment has changed.
 
-**Implementation reference:** The current-action inventory below reflects the frontend handoff baseline. Reconcile it with Rudy's latest implementation before making changes. This document does not claim that the proposed wording is implemented.
+**Implementation reference:** The current-action inventory below reflects the frontend handoff baseline. Reconcile it with Rudy's latest implementation before making changes. The wording is product-confirmed; implementation and deployed availability still require verification.
 
 ## 1. Caffeine Timing
 
@@ -31,7 +31,7 @@ Updated: October 17, 2026
 ### RD notes
 
 - Use rested-waking as the primary observation in a relevant sleep context. Base the explanation on sleep guidance, not a promise of improved evening energy.
-- If the demo requires an exact clock time, define it explicitly for that scenario and planned bedtime. Do not present it as a universal research-backed rule.
+- Use the fixed earlier-time wording without imposing a new clock cutoff. Existing intake and planned sleep times may be described as context; the Agent must not invent a timing prescription.
 - Do not infer that caffeine caused the user's recorded feelings.
 
 ## 2. Sleep Routine
@@ -127,12 +127,12 @@ Updated: October 17, 2026
 - Keep exact durations, frequencies and clock times distinguishable from research findings.
 - Let the Agent select from fixed, agreed action content rather than invent new instructions.
 - Require user confirmation before starting or changing a plan.
-- Preserve existing safety blocking and PRD approval requirements. Source references alone do not approve an action.
+- Preserve safety blocking and the evidence/configuration and engineering checks in PRD §3.3. Sources support the documented rationale, not guaranteed safety or effectiveness; no additional named professional sign-off is required.
 - Period dates remain background context only; do not generate period-derived actions.
 
 ## Implementation and release requirements
 
-- Prepare all three lifestyle categories for eligible reviewer exploration, not only the scripted demo. Product scope and wording are confirmed; record per-action content review, safety checks and actual deployment availability separately.
+- Prepare all three lifestyle categories for eligible reviewer exploration, not only the scripted demo. Product scope and wording are confirmed; record per-action source links, supported rationale, evidence limitations, eligible contexts, exclusions, stopping conditions, engineering test results and actual deployment availability separately.
 - For caffeine timing, use a relevant sleep/rested-waking context. An evening-energy/caffeine group difference alone must not trigger the action. Do not increase intake or prescribe a universal clock cutoff.
 - Keep all recording alternatives, including activity already planned, optional check-ins, and “Keep noticing [topic]”. Do not force lifestyle steps for every goal.
 - Seven days is a demo plan setting, not an effectiveness threshold. Use “After your main sleep, for 7 days”; replace “within an hour of waking” with “after waking from your main sleep”.
