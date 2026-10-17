@@ -7,6 +7,7 @@ import { loadState } from '@/server/repo';
 import { respond } from '@/server/agent';
 import { allowAiCall } from '@/server/limits';
 import { blank } from '@/domain/state';
+import { scriptedDemoReply } from '@/domain/demoConversation';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
   const body = Body.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: 'Write a message first.' }, { status: 400 });
   const state = (await loadState(sid)) || blank();
+  const demoReply = new URL(req.url).searchParams.get('mode') === 'demo' ? scriptedDemoReply(state, body.data.text) : null;
+  if (demoReply) return NextResponse.json({ reply: demoReply });
   // The original Agent remains unchanged. Its canned offline replies are not shown as live AI.
   if (new URL(req.url).searchParams.get('mode') === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ code: 'DEMO_CONSENT_REQUIRED', error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
   if (!geminiConfigured()) return NextResponse.json({ status: 'not-integrated', error: 'Gemini is not connected. Your message is saved; no Agent response was generated.' }, { status: 503 });

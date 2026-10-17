@@ -311,3 +311,20 @@ main.today.todayA { isolation: isolate; }
   .live-aura.aura-heart[data-aura-state=insight] .aura-core { animation: auraHeartReveal 1.5s ease-out; }
 }
 @keyframes auraHeartReveal { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
+
+/* Full demo questions wrap inside one familiar suggestion pill on narrow screens. */
+.chatpage.scene.v2 .pillrow.demoprompts { margin-inline: 0; padding-inline: 0; overflow: visible; }
+.chatpage.scene.v2 .demoprompts .pillopt { white-space: normal; flex: 1 1 auto; max-width: 100%; line-height: 1.4; padding: 10px 16px; }
+
+/* Conversation scrolls above the composer, so no reply or action can sit under it. */
+.chatpage.scene.v2.talk { height: 100dvh; min-height: 0; overflow: hidden; }
+.chatpage.scene.v2.talk .orbtop { flex: 0 0 46px; }
+.chatpage.scene.v2.talk .chatbody { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; overflow-anchor: none; scrollbar-width: thin; scroll-padding-block: 12px; }
+.chatpage.scene.v2.talk .convo { min-height: 100%; padding-block: 8px 18px; }
+.chatpage.scene.v2.talk .chatdock { position: relative; bottom: auto; flex: 0 0 auto; margin-top: 0; padding-top: 12px; }
+.replytext .replysegment { display: block; }
+.replytext .replysegment + .replysegment { margin-top: 10px; }
+@media (prefers-reduced-motion: no-preference) {
+  .replysegment.reveal { animation: reply-arrive 280ms cubic-bezier(.16, 1, .3, 1) both; }
+  @keyframes reply-arrive { from { opacity: .2; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+}
