@@ -4,11 +4,12 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionId } from '@/server/session';
 import { loadState, mutateState } from '@/server/repo';
-import { respond } from '@/server/agent';
+import { respond, stepsBlocked } from '@/server/agent';
 import { allowAiCall } from '@/server/limits';
 import { setPlanStatus, type State } from '@/domain/state';
 import { uid } from '@/domain/dates';
 import { isTopicId, TOPIC_IDS, type TopicId } from '@/domain/topics';
+import { scriptedDemoReply } from '@/domain/demoConversation';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,11 +38,15 @@ export async function POST(req: Request) {
   const q = body.data;
   const state = migrateState(await loadState(sid), mode);
   // The original Agent remains unchanged. Its canned offline replies are not shown as live AI.
-  if (mode === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ code: 'DEMO_CONSENT_REQUIRED', error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
   if (q.inputRevision !== undefined && q.inputRevision !== (state.inputRevision || 0)) return NextResponse.json({ error: 'Records changed. Refresh and try again.' }, { status: 409 });
   let topicId: TopicId | null = null;
   try { if (q.choice) topicId = resolveChoice(state, q.text, q.choice); }
   catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 400 }); }
+  // Only exact, labeled demo turns bypass generation. Keep main's revision,
+  // choice validation and persisted safety restrictions ahead of this path.
+  const demoReply = mode === 'demo' && !q.choice && !stepsBlocked(state) ? scriptedDemoReply(state, q.text) : null;
+  if (demoReply) return NextResponse.json({ reply: demoReply });
+  if (mode === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ code: 'DEMO_CONSENT_REQUIRED', error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
   if (!geminiConfigured()) return NextResponse.json({ status: 'not-integrated', error: 'Gemini is not connected. Your message is saved; no Agent response was generated.' }, { status: 503 });
   if (!allowAiCall(sid)) {
     return NextResponse.json({ reply: { text: 'I need a short rest before the next message. Your records are saved; try again in a little while.', action: null, draft: null, logOffer: null, via: 'verified-summary' } });

@@ -225,7 +225,7 @@ function AcceptSheet() {
     <>
       <p className="eyebrow">{observe ? 'Observe only' : 'Accept a small step'}</p><h2>{observe ? 'Keep noticing, no change.' : 'Make the next step clear.'}</h2>
       <label className="inputlabel">Linked observation<select id="plan-obs" value={target} onChange={e => dispatch('plan-obs', undefined, { value: e.target.value })}>{opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      {observe ? <p className="soft">No routine change. You will only answer your check-in.</p> : <label className="inputlabel">What you will do<textarea id="plan-step" defaultValue={d.step} readOnly /><small>Recording actions use the reviewed wording. Adjust timing below.</small></label>}
+      {observe ? <p className="soft">No routine change. You will only answer your check-in.</p> : <label className="inputlabel">What you will do<textarea id="plan-step" defaultValue={d.step} readOnly /><small>Actions use the reviewed wording. Confirm the arrangement and dates below.</small></label>}
       <label className="inputlabel">Start date<input id="plan-start" type="date" defaultValue={today()} /></label>
       <label className="inputlabel">Review date<input id="plan-review" type="date" defaultValue={addDays(today(), d.fromFactor ? 3 : 6)} /></label>
       <div className="callout">You will answer: “{t.question}”<br />{observe ? 'Feelings only, no execution log.' : 'Each feedback: what you did, this answer, and anything that got in the way.'}<br />A review date does not guarantee enough records to compare.</div>

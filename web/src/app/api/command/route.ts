@@ -5,6 +5,9 @@ import { mutateState } from '@/server/repo';
 import { applySafetyFeedback, hasSafetyHold, migrateState, modeOf, modeSid, DaySchema, WallTimeSchema, wallClock } from '@/server/statePolicy';
 import { acceptPlan, dayCheckin, saveCheckin, setPlanStatus, type Feedback } from '@/domain/state';
 import { stepDraft } from '@/domain/uiSteps';
+import { stepsBlocked } from '@/server/agent';
+import { planConfirmation } from '@/domain/chatPresentation';
+import { offeredDemoDraft } from '@/domain/demoConversation';
 import { buildDemo } from '@/domain/demo';
 import { uid } from '@/domain/dates';
 import { isTopicId } from '@/domain/topics';
@@ -50,15 +53,19 @@ export async function POST(req: Request) {
           const o = state.observations.find(o => o.id === d.observationId && o.topicId === d.topicId && o.status === 'active');
           if (!o) throw new Error('Confirm the observation before accepting a plan');
           if (review && (review.recommendation !== 'adjust' || !review.proposal || review.safety.pause)) throw new Error('This review does not approve a replacement action');
-          const draft = review?.proposal || stepDraft(String(d.stepId), d.topicId);
+          const demoDraft = offeredDemoDraft(state, String(d.stepId));
+          if (demoDraft && stepsBlocked(state, o.topicId)) throw new Error('This topic is on safety hold. Observe or stop.');
+          const draft = review?.proposal || demoDraft || stepDraft(String(d.stepId), d.topicId);
           if (review && p?.observationId !== o.id) throw new Error('Review belongs to another observation');
           if (!draft || draft.topicId !== o.topicId) throw new Error('Action not approved for this topic');
           if (hasSafetyHold(state, o.topicId) && draft.kind !== 'observe') throw new Error('This topic is on safety hold. Observe or stop.');
           if (typeof d.step === 'string' && d.step !== draft.step) throw new Error('Edited intervention text is not approved. Use the reviewed recording action.');
           const dates = z.object({ start: DaySchema, review: DaySchema }).parse(d);
           if (dates.review < dates.start) throw new Error('Review must follow start');
-          const next = acceptPlan(state, { ...draft, lineageId: review && p ? p.lineageId : undefined }, { ...dates, observationId: o.id, topicId: o.topicId, step: draft.step });
+          const next = acceptPlan(state, { ...draft, lineageId: review && p ? p.lineageId : demoDraft ? state.plans.find(prior => prior.observationId === o.id && ['active', 'observing'].includes(prior.status))?.lineageId : undefined }, { ...dates, observationId: o.id, topicId: o.topicId, step: draft.step });
+          if (demoDraft) { const offered = state.messages.at(-1); if (offered) offered.draft = null; }
           if (review && p) next.basedOn = { aiReviewId: review.id, requestId: review.requestId, fromPlanId: p.id, fromVersion: p.version };
+          state.messages.push(planConfirmation(state, next));
           state.decisions.push({ id: uid('dec'), choice: 'accept', reason: '', planId: p?.id || next.id, version: p?.version || next.version, newPlanId: next.id, aiReviewId: review?.id, at: new Date().toISOString() });
         } else {
           if (!p || p.version !== d.planVersion || p.status === 'replaced') throw new Error('Plan not found or replaced');

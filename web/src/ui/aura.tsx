@@ -1,7 +1,10 @@
 'use client';
 // Aura chat (ported from views.js chat()). Replies come from /api/aura.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { replySegments } from '@/domain/chatPresentation';
+import { scrollAuraToLatest } from './chatScroll';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { activeObservations, currentPlans, plan as findPlan, type Message, type Plan } from '@/domain/state';
+import { nextDemoTurn, isScriptedDemoMessage } from '@/domain/demoConversation';
 import { topic } from '@/domain/topics';
 import { AuraMark, Btn } from './core';
 import { dispatch, sendToAura } from './actions';
@@ -50,6 +53,8 @@ function PlanCard({ p }: { p: Plan }) {
 
 function suggestions(): [string, string, string, Record<string, string>?][] {
   const s = S();
+  const next = nextDemoTurn(s);
+  if (next) return [[next.turn.user, 'prompt', next.turn.user]];
   const plans = currentPlans(s);
   if (plans.length) return [['Review my step', 'open', 'review', { plan: plans[0].id }], ['Add context', 'open', 'food'], ['Change my step', 'prompt', 'Help me adjust my step for a busy week.']];
   const dynamic = s.messages.at(-1)?.interaction;
@@ -91,10 +96,46 @@ function NextUpCard() {
   const o=opts[ui.nextUp % opts.length];
   return <article className="stepcard nextup"><p className="nexttag">Your next action</p><h3>{o.label}</h3><div className="nextfoot"><Btn act={o.act} val={o.value} cls="pillbtn">{o.cta}</Btn><Btn act="nextup-shuffle" cls="quiet">Another idea</Btn></div></article>;
 }
+
+// New replies reveal complete sentences. History is immediate and reduced motion
+// skips the sequence; actionable controls appear when the answer is complete.
+function ReplyText({ text, animate, onRevealing }: { text: string; animate: boolean; onRevealing: (value: boolean) => void }) {
+  const parts = useMemo(() => replySegments(text), [text]);
+  const [count, setCount] = useState(() => animate && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : parts.length);
+  const revealing = count < parts.length;
+  useLayoutEffect(() => {
+    if (!animate) return;
+    onRevealing(revealing);
+    const frame = requestAnimationFrame(() => scrollAuraToLatest(false));
+    return () => cancelAnimationFrame(frame);
+  }, [count, animate, revealing, onRevealing]);
+  useEffect(() => {
+    if (!revealing) return;
+    const timer = setTimeout(() => setCount(n => n + 1), Math.min(1100, Math.max(650, parts[count - 1].length * 9)));
+    return () => clearTimeout(timer);
+  }, [count, revealing, parts]);
+  return <div className="replytext" aria-busy={revealing}>{parts.slice(0, count).map((part, i) => <span className={animate ? 'replysegment reveal' : 'replysegment'} key={i}>{part}</span>)}</div>;
+}
+
 export function Aura() {
   const s = S();
   const [text, setText] = useState('');
   const [attach, setAttach] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const initialMessages = useRef(s.messages.length);
+  useLayoutEffect(() => {
+    const viewport = document.querySelector('.chatbody');
+    const content = document.querySelector('.convo');
+    const dock = document.querySelector('.chatdock');
+    if (!viewport || !content || !dock) return;
+    const observer = new ResizeObserver(() => scrollAuraToLatest(false));
+    observer.observe(content); observer.observe(dock);
+    scrollAuraToLatest(false);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    if (!ui.modal) scrollAuraToLatest(false);
+  }, [s.messages.length, ui.pending, ui.modal, revealing]);
   const hero = !s.messages.length && !currentPlans(s).length;
   const heroOrbRect = useRef<DOMRect | null>(null);
   useLayoutEffect(() => {
@@ -135,7 +176,7 @@ export function Aura() {
   },[hero]);
   const d = ui.draft;
   const sug = suggestions();
-  const send = () => { const t = text.trim(); if (t && !ui.pending) { setText(''); sendToAura(t); } };
+  const send = () => { const t = text.trim(); if (t && !ui.pending && !revealing) { setText(''); sendToAura(t); } };
   const offer = ui.logOffer && !ui.pending ? ui.logOffer : null;
   return (
     <main className={`chatpage scene v2 ${hero ? 'hero' : 'talk'} ${ui.pending ? 'thinking' : ''} ${ui.chatError ? 'haserror' : ''} ${attach ? 'menuopen' : ''}`}>
@@ -149,14 +190,14 @@ export function Aura() {
         {!hero ? <div className="cb aura">Hi, I’m Aura. Tell me about your day, and we’ll make sense of it together.</div> : null}
         {s.messages.map((m, i) => (
           <div key={i} className={`cb ${m.role === 'guide' ? 'aura' : 'me'}${m.meta?.safety === 'emergency' ? ' urgent' : ''}${ui.freshMsg === s.messages.length && i === s.messages.length-1 ? ' fresh' : ''}`}>
-            {m.role === 'guide' ? <span className="speaker">Aura{m.meta && VIA[m.meta.via] ? <small className="via"> · {VIA[m.meta.via]}</small> : null}</span> : null}
-            {m.text.split('\n').map((line, k) => <span key={k}>{k ? <br /> : null}{line}</span>)}
-            <MessageAction m={m} />
+            {m.role === 'guide' ? <span className="speaker">Aura{m.meta && VIA[m.meta.via] ? <small className="via"> · {m.meta.cited?.some(id => id.startsWith('plan-confirmed:')) ? 'Step confirmed' : isScriptedDemoMessage(m) ? 'Scripted demo' : VIA[m.meta.via]}</small> : null}</span> : null}
+            {m.role === 'guide' ? <ReplyText text={m.text} animate={i >= initialMessages.current && i === s.messages.length - 1 && ui.freshMsg === s.messages.length && m.meta?.safety !== 'emergency'} onRevealing={setRevealing} /> : m.text}
+            {!(revealing && i === s.messages.length - 1) ? <MessageAction m={m} /> : null}
             {m.insights?.map(insight => <article className="agentinsight" key={insight.id}><strong>{insight.title}</strong><p>{insight.text}</p>{insight.limitations?.map((l,k)=><small key={k}>{l}</small>)}</article>)}
-            {m.interaction && m.interaction.kind !== 'suggestions' ? <div className="agentchoices" role="group" aria-label={m.interaction.question || 'Choose a reply'}>{m.interaction.question ? <p>{m.interaction.question}</p> : null}{m.interaction.options.map(o=><button key={o.id} className="pillopt" disabled={ui.pending || i !== s.messages.length-1} onClick={()=>sendToAura(o.text,false,{messageIndex:i,optionId:o.id,topicId:o.topicId})}>{o.label}</button>)}</div> : null}
+            {m.interaction && m.interaction.kind !== 'suggestions' ? <div className="agentchoices" role="group" aria-label={m.interaction.question || 'Choose a reply'}>{m.interaction.question ? <p>{m.interaction.question}</p> : null}{m.interaction.options.map(o=><button key={o.id} className="pillopt" disabled={ui.pending || revealing || i !== s.messages.length-1} onClick={()=>sendToAura(o.text,false,{messageIndex:i,optionId:o.id,topicId:o.topicId})}>{o.label}</button>)}</div> : null}
           </div>
         ))}
-        {d ? (
+        {d && !revealing ? (
           <div className="stepcard suggestion"><span className="eyebrow">A suggestion, not a commitment · {topic(d.topicId).name}</span><h3>{d.title}</h3><p>{d.desc}</p>
             <div className="tags"><span>{d.duration}</span><span>{d.days}</span></div>
             <Btn act="open" val="preview">See this small step</Btn><Btn act="observe" cls="text">Just observe for now</Btn></div>
@@ -173,16 +214,16 @@ export function Aura() {
       </div></div>
       <div className="chatdock">
         {attach ? <div className="pillstack attach" role="menu">{[['food','Log food'],['caffeine','Log a drink'],['chatcheckin','Check in'],['photo','Choose a photo']].map(([id,label],i) => <button key={i} className="pillopt" role="menuitem" onClick={() => { setAttach(false); if(id==='photo') dispatch('chat-photo',undefined,{}); else dispatch('open',id,{}); }}>{label}</button>)}</div> : null}
-        {sug.length ? <div className="pillrow">{sug.map(([l,act,v,data]) => <button key={l} className="pillopt" disabled={ui.pending} onClick={e => { const interaction=s.messages.at(-1)?.interaction; const option=interaction?.kind === 'suggestions' ? interaction.options.find(o=>o.label===l && o.text===v) : null; if(option) sendToAura(option.text,false,{messageIndex:s.messages.length-1,optionId:option.id,topicId:option.topicId}); else dispatch(act,v,data || {},e.currentTarget); }}>{l}</button>)}</div> : null}
+        {sug.length ? <div className={`pillrow ${nextDemoTurn(s) ? 'demoprompts' : ''}`}>{sug.map(([l,act,v,data]) => <button key={l} className="pillopt" disabled={ui.pending || revealing} onClick={e => { const interaction=s.messages.at(-1)?.interaction; const option=interaction?.kind === 'suggestions' ? interaction.options.find(o=>o.label===l && o.text===v) : null; if(option) sendToAura(option.text,false,{messageIndex:s.messages.length-1,optionId:option.id,topicId:option.topicId}); else dispatch(act,v,data || {},e.currentTarget); }}>{l}</button>)}</div> : null}
         <div className="composerrow"><form id="chat-form" className={`composer pillcomposer ${text.trim() ? 'hastext' : ''}`} onSubmit={e => { e.preventDefault(); send(); }}>
           <button type="button" className={`cplus ${attach ? 'open' : ''}`} aria-expanded={attach} aria-label="Add to the conversation" onClick={() => setAttach(!attach)}>＋</button>
           <label className="sr-only" htmlFor="message">Message Aura</label>
           <textarea id="message" placeholder="Talk to Aura…" rows={1} required value={text} maxLength={2000}
             onChange={e => { setText(e.target.value); if (!ui.pending) ui.auraState = e.target.value ? 'listening' : 'idle'; }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} />
-          <button className="csend" aria-label={ui.pending ? 'Waiting for Aura' : 'Send message'} type="submit" disabled={ui.pending} aria-busy={ui.pending}>↑</button>
+          <button className="csend" aria-label={ui.pending ? 'Waiting for Aura' : 'Send message'} type="submit" disabled={ui.pending || revealing} aria-busy={ui.pending}>↑</button>
         </form></div>
-        <small className="footnote">{ui.ai.enabled ? 'Replies by Gemini, checked against your records. Not medical advice.' : 'Gemini is not connected. Messages are saved; AI replies are unavailable. Not medical advice.'}</small>
+        <small className="footnote">{s.mode === 'demo' ? 'Suggested prompts use scripted demo replies. Free text uses Gemini when connected. Not medical advice.' : ui.ai.enabled ? 'Replies by Gemini, checked against your records. Not medical advice.' : 'Gemini is not connected. Messages are saved; AI replies are unavailable. Not medical advice.'}</small>
       </div>
     </main>
   );
