@@ -30,7 +30,7 @@ Updated: October 17, 2026
 
 ### RD notes
 
-- Base the explanation on sleep guidance, not a promise of improved evening energy.
+- Use rested-waking as the primary observation in a relevant sleep context. Base the explanation on sleep guidance, not a promise of improved evening energy.
 - If the demo requires an exact clock time, define it explicitly for that scenario and planned bedtime. Do not present it as a universal research-backed rule.
 - Do not infer that caffeine caused the user's recorded feelings.
 
@@ -55,7 +55,7 @@ Updated: October 17, 2026
 ### RD notes
 
 - Use the confirmed flexible wording above; do not carry over the earlier mandatory 30-minute, three-night prescription.
-- Do not instruct users to reduce sleep or force an earlier bedtime.
+- Use rested-waking as the primary observation; evening energy may supply context but is not an interchangeable outcome. Do not instruct users to reduce sleep or force an earlier bedtime.
 - Do not claim the action treats insomnia.
 
 ## 3. Physical Activity
@@ -80,7 +80,7 @@ Updated: October 17, 2026
 ### RD notes
 
 - Use the confirmed short, comfortable walk wording; do not enforce the earlier 10-minute, three-days-per-week prescription.
-- Keep after-work and evening timing tied to the selected scenario; do not assume they produce the same outcome.
+- For this demo, use evening-energy as the primary observation when the user wants a suitable activity-related step. Record execution separately. Do not attach the action to rested-waking, stress or productivity automatically; do not assume after-work and evening timing produce identical outcomes.
 - Do not automatically increase duration or intensity when feedback shows no improvement.
 
 ## 4. Recording and Self-Monitoring
