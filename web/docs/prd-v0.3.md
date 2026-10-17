@@ -4,7 +4,7 @@
 - Source last edited: October 17, 2026
 - Synced to this repository: October 17, 2026 (Asia/Taipei)
 
-This file mirrors the source PRD, including the October 17 confirmed action decisions. Implementation and release-review status require separate evidence. Linked specification appendices and the Notion change log remain external references; their contents are not copied into this file.
+This file mirrors the source PRD, including the October 17 confirmed action and goal-management decisions. Implementation and release-review status require separate evidence. Linked specification appendices and the Notion change log remain external references; their contents are not copied into this file.
 
 ---
 
@@ -124,7 +124,7 @@ GitHub: repository URL to be added. Feature parity between the two deployments a
 5. **Topics and Discovery:** Observations, evidence, limitations and next steps; separate states per topic.
 6. **Review:** Execution, before/after records and Agent updates; continue, modify or stop.
 Concurrent topics do not imply many simultaneous changes. Prefer only a small number of active steps per round to avoid burden and uninterpretable results.
-### Topic setup options: scope and effort comparison — decision pending
+### Topic setup options: historical alternatives and effort estimates
 Free text is an expression method, not a promise to support arbitrary health questions. These planning estimates assume one engineer familiar with the technology, with basic UI, database and Gemini calls already available. Person-days are workload, not calendar duration or a delivery commitment. Estimates exclude topic-specific analysis engines, health-content validation and overall integration; engineering must reassess them.
 <table header-row="true">
 <tr>
@@ -207,6 +207,14 @@ Acceptance for option B must cover different expressions mapping to one template
 See the Topic Behavior Definitions appendix for full English questions and five-level labels. Fatigue, sleepiness, focus and energy are not synonyms. Natural language may propose labels for confirmation, but must not assign precise scores automatically. Early responses cover only experiences before their cutoff.
 **Data relationship: Goal → Observation → Check-in / Metric → Analysis → Agent response → optional Plan → Feedback → Review.**
 Goals and observations may have many-to-many links. Share sleep, caffeine, activity, period dates and notes, but not scores for different feelings. Each plan has one primary observation; related observations provide context. Offer at most one primary intervention per round. Users can keep recording after declining/stopping a plan. Do not produce an overall health score.
+#### Onboarding and Settings — confirmed goal management
+- Onboarding retains concern questions to establish the initial context and recommend goals/observations. Concern responses describe the starting context; they are not the ongoing source of truth for current goals.
+- Settings → Your goals → Edit opens a dedicated goal selector. It does not reopen onboarding, “Check your starting point”, or concern selection.
+- Users select goals only. The system displays the matched observation as read-only text, preserving existing suitable links; for a new goal, select the highest-weight suitable topic from the fixed catalog, using catalog order to break ties. Reuse the same observation/check-in when goals share a topic. Do not invent a new scale or equate different feelings merely to fill a goal link.
+- Update both sides of the goal/observation relationship atomically. Removing a goal removes only links to that goal; retain observations, other goal links, prior plans and historical records. Do not stop an observation merely because its last goal was removed.
+- Preserve existing stopped-observation status when a link is unchanged. If adding a goal will resume a stopped observation, disclose this in the selection summary before saving. Closing without saving discards the draft.
+- Settings goal cards show current goals, not a fresh derivation from onboarding concerns. Agent context uses current goals, confirmed observation links and actual records, while retaining relevant historical context.
+- Catalog mappings express supported tracking relationships, not proof that a feeling measures every aspect of a broad goal. If a goal has no suitable configured observation, do not force an unrelated pairing; explain the supported scope and offer a supported goal or recording alternative.
 ### Required Discovery card content
 - Observation topic and data period.
 - A specific observation or “Not enough information to assess yet.”
@@ -368,8 +376,8 @@ These examples draw on [NHS headaches](https://www.nhs.uk/symptoms/headaches/), 
 The main story remains energy after work, with sleep, caffeine and overtime context: clarify evidence and uncertainty → choose a feasible next step → capture execution, feelings and barriers separately → review and continue the user's choices.
 **Fixed lifestyle action content**
 - **Caffeine timing — “Try an earlier caffeine time”:** “If it fits your routine, move your usual late caffeinated drink earlier. Record the time and continue your sleep-related check-in.” Offer when the user wants to explore late caffeine and sleep, using rested-waking as the primary supported observation. Do not prescribe a universal noon/2 pm cutoff, increase intake, or claim this improves evening energy. An energy/caffeine group difference alone is not an eligibility trigger.
-- **Sleep routine — “Make room for a quieter bedtime routine”:** “Choose a quiet activity before your planned bedtime, such as reading or relaxing without bright screens. Continue recording how rested you feel after waking.” Use for a relevant sleep/restedness goal and bedtime context; do not reduce sleep, force an earlier bedtime or claim insomnia treatment.
-- **Everyday activity — “Try a short, comfortable walk”:** “If walking is suitable for you and fits your schedule, try a short walk at a comfortable pace. Continue your usual check-in and note how you feel.” Offer only when the user wants an activity-related next step and can comfortably participate. Do not present walking as a proven remedy for evening fatigue or next-morning restedness, or automatically increase intensity after no improvement.
+- **Sleep routine — “Make room for a quieter bedtime routine”:** “Choose a quiet activity before your planned bedtime, such as reading or relaxing without bright screens. Continue recording how rested you feel after waking.” Use `rested-waking` as the primary observation for a relevant sleep/restedness goal and bedtime context. Evening energy can be related context but is not an interchangeable outcome. Do not reduce sleep, force an earlier bedtime or claim insomnia treatment.
+- **Everyday activity — “Try a short, comfortable walk”:** “If walking is suitable for you and fits your schedule, try a short walk at a comfortable pace. Continue your usual check-in and note how you feel.” For this demo, use `evening-energy` as the primary observation when the user explicitly wants an activity-related next step and can comfortably participate. Check-ins record evening feelings, not activity completion; record execution separately. Do not automatically attach this action to `rested-waking`, stress or productivity. Do not present walking as a proven remedy for evening fatigue or next-morning restedness, or automatically increase intensity after no improvement.
 **Recording and observation alternatives**
 - “Notice your caffeine routine”: record caffeinated drinks and their times without changing usual intake.
 - “Check in after waking”: record how rested the user feels after their main sleep.
@@ -419,7 +427,7 @@ Public requirements call for a working prototype built on Google Cloud; both mem
 **Use the engineering repository as the integration source: create an isolated branch from main → modify/test → open a PR for engineering review → merge/deploy under the team's process.** Branch/PR collaboration has been agreed; the source document still lists the repository URL as pending. Gemini handles extraction, contextual explanations and review; prompts do not replace programmatic calculations or server validation. Do not overwrite the deployed Gemini functionality with ZIP preset conversations.
 ### Demonstration principles
 Compress elapsed time with clearly labelled synthetic historical cases while actually demonstrating new input, analysis and feedback updates. A demo establishes functionality, not long-term health effectiveness.
-The proposed main storyline uses Evening energy plus Feeling rested on waking, with afternoon caffeine and overtime constraints. Final demo topics require joint confirmation. Open Day 10 directly → add a confirmed record → submit feedback on an existing plan → Gemini reviews the actual updated data → user confirms the update. Do not switch Day 4 → Day 10 while implying new input persisted: changing the day rebuilds the case, requiring confirmation and disclosure that new case inputs are discarded. Historical data is synthetic; new live input is demo-live and must never enter personal data.
+**Confirmed main storyline:** Evening energy (`evening-energy`) plus Feeling rested on waking (`rested-waking`), with afternoon caffeine and overtime constraints. The goal is to have energy after work for meaningful activities; sleep and caffeine are relevant context, not established causes. Show evidence and uncertainty → choose a feasible next step → capture execution, feelings and barriers → review and continue the user's choices. Open Day 10 directly → add a confirmed record → submit feedback on an existing plan → Gemini reviews the actual updated data → user confirms the update. Do not switch Day 4 → Day 10 while implying new input persisted: changing the day rebuilds the case requires confirmation and disclosure that new case inputs are discarded. Historical data is synthetic; new live input is demo-live and must never enter personal data.
 ### Evaluation and language
 Published weights: Technical Merit & Gen AI Implementation 40%; Problem Alignment & Impact 25%; Innovation & Creativity 25%; User Experience & Solution Design 10%. Submission language: English.
 ### Video outline — draft, not confirmed
@@ -537,6 +545,7 @@ Use clearly labelled mock/synthetic historical cases for the judging flow. New l
 **Scope:** Acceptance applies to the judging demo using labelled synthetic history and demo-live inputs. Real health-data imports, physical-device connectivity, HealthKit authorization, device sync and real-world outcome validation are not acceptance requirements for this submission. Existing import functionality is retained; real-data extensions remain future scope. Actual Gemini calls, demo persistence, analysis correctness, user confirmation, isolation and safety behavior are still required where included in the demonstrated flow.
 - [ ] All five topic IDs, questions, scale directions and times are consistent; afternoon sleepiness does not produce an evening-energy plan.
 - [ ] Goal/observation/plan relationships are traceable; scores for different feelings are not shared or combined into one success metric.
+- [ ] Onboarding retains concerns; Settings edits goals without reopening setup. Automatic suitable matching reuses observations, preserves valid existing links and history, removes only cancelled-goal links, and saves both link directions together. Verify cancellation and disclosure before resuming a stopped observation.
 - [ ] Identical input receives appropriately different responses under different valid contexts. Do not re-ask known facts or invent missing ones. Pass appendix scenarios M01–M14.
 - [ ] Stress/productivity do not enable unconfigured comparisons. HRV does not estimate psychological stress or enter Discovery v1.
 - [ ] The server validates Summary/Analysis sources, windows, coverage and claim permissions. Period dates are excluded from model context without permission.
@@ -563,17 +572,23 @@ Use clearly labelled mock/synthetic historical cases for the judging flow. New l
 - [ ] Mapping failure and mock cases with insufficient comparison data still support understandable recording and missing-data flows.
 - [ ] Confirm contracts/examples used by the demo and trace synthetic history separately from demo-live inputs; neither may leak into personal records.
 - [ ] Complete all five submission items with consistent descriptions and tested access.
-## 8. Decisions and confirmations before scope freeze
-1. Main demo problem and second concurrent topic.
-2. Web/native/other delivery form, skills and implementation ownership.
-3. Confirm the deployed demo platform and labelled mock-source coverage. Real device/platform combinations, HealthKit permissions and import/sync validation are future scope, not decisions blocking this mock-data demo.
-4. Gemini/Google Cloud services and spending limits remain to be confirmed. Demo Discovery thresholds are decided in §3.1; Rudy must verify analysis IDs, configVersion and implementation acceptance. Dynamic RAG remains out of scope.
-5. Confirm mock/synthetic case coverage, versions and operational acceptance. The proposed 56-day period lookback, real period-data sources/coverage/sync and comparison rules are real-data future scope, not submission prerequisites.
-6. Authentication, photo storage, deletion and trial-data handling.
-7. Official team registration, specified deck, deadline timezone, video details and deployment uptime.
-8. Constrained option B or template-plus-notes fallback (§2), templates, scales, clarification limit and revised boundary-handling estimates.
-9. Safety-review owner, English wording and release fallback conditions (§3.3).
-10. Joint contract v0.1, source/time/missingness, grounding checks, session isolation and all implementation owners.
+## 8. Confirmed decisions and remaining release checks
+### Confirmed product decisions
+- Main story: energy after work, with `evening-energy` and `rested-waking`, caffeine and overtime context (§5).
+- The judging flow uses labelled mock history and actual supported demo-live backend interactions. Real-device import/sync acceptance and 56-day period comparisons remain future scope.
+- Discovery: 28 days, 4 valid days, at least 2 paired days per group, mean and 0.5-point cutoff (§3.1). Existing 7/14-day charts must distinguish their range from the analysis range.
+- Onboarding retains concerns; Settings edits goals only and automatically matches suitable observations (§2.1).
+- All three lifestyle categories, fixed English copy, topic eligibility, user confirmation, alternatives and timing rules are product-confirmed (§3.3.1). They are available for eligible reviewer exploration once each action passes its release checks, not limited to the scripted path.
+- Safety blocking and per-action fallback to recording/observation are required. Seven-day plans are demo settings, not effectiveness thresholds. Dynamic RAG remains out of scope.
+### Remaining engineering and release verification
+1. Verify the deployed version, source/analysis IDs, configVersion and actual Gemini calls. Record pass/fail evidence rather than treating a product decision as implementation completion.
+2. Record the content-review owner and outcome for each lifestyle action's health scope, eligibility, exclusions and stopping conditions (§3.3). This is distinct from Ellie's product/copy confirmation; RD is not automatically the professional health-content reviewer. An action with incomplete checks remains unavailable; an independently cleared action may be enabled.
+3. Verify all action routes, including chat, findings and Review, enforce fixed eligible IDs, confirmation, safety blocking and no automatic intensification. Confirm the supported topic mappings, not just action wording.
+4. Confirm option B mapping/clarification behavior, topic questions/scales, shared records, Settings goal-link integrity, and handling of unsupported inputs. Engineering estimates and implementation coverage remain separate from the product target.
+5. Verify demo isolation, synthetic/demo-live provenance, reset behavior, cutoff handling and the Day 10 Review with new input.
+6. Confirm authentication, photo storage/deletion, retention, service credentials and spending limits; keep secrets and private health data out of Git.
+7. Confirm API contracts, revisions, versions, timestamps, missingness and grounding against the deployed code, assigning implementation owners where needed.
+8. Check official submission requirements, repository/deployment access, deadline timezone, video duration, deliverables and uptime. Earlier timeline dates and estimates are historical planning, not completion evidence.
 ## 9. Specification appendices and sources
 The following four specification appendices define product/AI behavior and engineering requirements; they are not completion claims:
 - [Aura · Daily HRV & Relative Index Tracking — Spec](https://app.notion.com/p/3f3cf214d45e814bbf93fbdc78172ee4): Full HRV Relative Index specification; original PDF dated October 6, 2026, incorporated October 8.
