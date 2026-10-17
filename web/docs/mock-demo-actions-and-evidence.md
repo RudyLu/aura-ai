@@ -2,142 +2,173 @@
 
 Updated: October 17, 2026
 
-**Purpose:** Document the product-confirmed action categories and copy for reviewer exploration, with supporting evidence. Product scope and wording were confirmed on October 17, 2026. Activation depends on traceable source evidence, fixed eligibility/limitations and passing engineering checks in PRD §3.3. No named professional health-content reviewer or external sign-off is required for this mock demo; do not claim clinical validation.
+## Implementation decision
 
-**Availability reported by Rudy:** Lifestyle actions were disabled and recording/check-in actions were enabled at his production review. This document does not establish that deployment has changed.
+Enable the five existing caffeine, sleep, and walking actions with the wording and eligibility rules below for reviewer exploration beyond the scripted demo. Keep all recording and observe-only actions available. A lifestyle action is not required for every goal. This specification is an implementation decision, not a claim that the changes are deployed or clinically validated.
 
-**Implementation reference:** The current-action inventory below reflects the frontend handoff baseline. Reconcile it with Rudy's latest implementation before making changes. The wording is product-confirmed; implementation and deployed availability still require verification.
+Scope: update existing action content and selection rules; no new action category or content-management system is required. This document supersedes the earlier pending-review language. Preserve runtime safety handling and user confirmation before starting or changing a plan.
 
-## 1. Caffeine Timing
+## Verified inventory and implementation baseline
 
-### Earlier action labels — not the confirmed replacement copy
+Inventory was inspected in the local `ellie/aura-v2` checkout at `4751510`. The five lifestyle actions are suppressed by the empty intervention map in `web/src/domain/uiDiscovery.ts`, but remain in the legacy catalog in `web/src/domain/discovery.ts` and the Agent menu in `web/src/domain/steps.ts`. They are not uniformly disabled across all code paths. Synchronize Discovery and Agent behavior when implementing this specification.
 
-- Last coffee before noon.
-- No caffeine after 2 pm.
+| Existing ID | Existing title | Target decision and title |
+| --- | --- | --- |
+| `finding:caffeine-before:1` | Last coffee before noon | Enable: Try an earlier caffeine time |
+| `finding:caffeine-late:1` | No caffeine after 2 pm | Enable: Try an earlier caffeine time |
+| `finding:short-sleep:1` | Wind down 30 minutes earlier | Enable: Make room for a quieter bedtime routine |
+| `finding:movement-same:0` | A 10-minute walk after work | Enable: Try a short walk after work |
+| `finding:movement-prev:0` | A 10-minute evening walk | Enable: Try a short, comfortable evening walk |
 
-**Category:** Caffeine timing / sleep habits.
+Retain these IDs. The two caffeine entries share content; show only one caffeine action in a recommendation set.
 
-**Evidence:** NIH/NHLBI advises avoiding caffeine that may interfere with sleep. A randomized crossover study also examined how caffeine dose and timing affect subsequent sleep. These sources do not establish noon or 2 pm as universal cutoffs.
+| Existing recording/observation ID | Existing title | Target behavior |
+| --- | --- | --- |
+| `chat:checkin-tonight` | Answer tonight’s evening-energy check-in, or skip it | Keep available for `evening-energy`; answering and skipping are valid choices. This is the exact catalog title corresponding to “Answer tonight’s check-in, or skip it.” |
+| `observe:${topicId}` | Keep noticing [topic] | Keep available; substitute the actual topic name; preserve observe-only behavior. Defined in `web/src/domain/uiSteps.ts`. |
+| `chat:caffeine-log` | Log each caffeinated drink with its time | Keep available for relevant caffeine observation; no intake change required. |
+| `chat:movement-notice` | Check your evening energy on days you move | Keep available for `evening-energy`; notice already-planned activity, without adding a workout. |
+| `chat:busy-week` | Answer one [check-in name] this week | Keep available for the relevant topic; the user chooses a day. |
+| `chat:waking-checkin` | Answer a waking check-in each morning | Keep available for `rested-waking`; rename to “Check in after your main sleep.” Replace “Each morning for 7 days” with “After your main sleep, for 7 days” and remove the within-one-hour requirement. |
 
-- [NIH/NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
-- [Dose and Timing Effects of Caffeine on Subsequent Sleep — randomized crossover trial](https://pubmed.ncbi.nlm.nih.gov/39377163/)
+These are catalog/UI availability observations, not an end-to-end verification of the deployed build.
 
-### Product-confirmed action
+## 1. Caffeine timing
+
+### `finding:caffeine-before:1`
+
+- **Eligibility:** A user wants to explore caffeine timing, or has a sleep-related goal and reports late caffeine use. Afternoon sleepiness, focus, or evening energy alone is insufficient. Existing `afternoon-sleepiness` or `evening-energy` observations may remain attached, but must not be presented as proof of a sleep benefit. Sleep-specific monitoring uses an existing or user-confirmed `rested-waking` observation.
+- **Conditions:** Establish actual caffeine use, usual timing, main-sleep timing, and willingness to try a timing adjustment. Caffeine before a check-in does not establish caffeine close to sleep. Ask about missing timing context before recommending.
+- **Expected behavior:** Explain the option using general sleep guidance and the user's stated context. Never infer that an earlier drink will improve evening energy from the `caffeine-before` comparison.
+- **Acceptance:** With only an afternoon-slump goal and unknown intake timing, clarify or offer relevant recording. With confirmed late intake and interest in adjustment, offer the action without promising benefit.
+
+### `finding:caffeine-late:1`
+
+- **Eligibility:** Fall asleep more easily, Wake up rested, or Keep steadier sleep times, with `rested-waking`. Other goals qualify only when the user also expresses a sleep concern and chooses that observation.
+- **Conditions:** Confirm late intake relative to the user's main sleep and agree on a feasible earlier time. An existing after-2-pm grouping is an analysis setting, not a universal cutoff.
+- **Expected behavior:** Adapt to shift schedules and the user's sleep period. Do not equate an earlier clock time with a suitable recommendation for every schedule.
+- **Acceptance:** A shift worker receives main-sleep-relative wording. A user who does not consume caffeine does not receive this action. Both caffeine entries produce at most one visible option.
+
+### Shared wording
 
 **Try an earlier caffeine time**
 
-> If it fits your routine, move your usual late caffeinated drink earlier. Record the time and continue your sleep-related check-in.
+> If it fits your routine, try moving a usual late caffeinated drink earlier. Log when you have it and keep noticing how you feel. There is no need to increase your intake.
+>
 
-### RD notes
+If a waking observation is active, add: “Continue recording how rested you feel after your main sleep.” Do not silently create a new observation.
 
-- Use rested-waking as the primary observation in a relevant sleep context. Base the explanation on sleep guidance, not a promise of improved evening energy.
-- Use the fixed earlier-time wording without imposing a new clock cutoff. Existing intake and planned sleep times may be described as context; the Agent must not invent a timing prescription.
-- Do not infer that caffeine caused the user's recorded feelings.
+**Evidence:** NHLBI advises avoiding caffeine that may interfere with sleep. A randomized crossover trial examined dose and timing in 23 males and found different effects for 100 mg and 400 mg doses. This supports considering timing and dose, not universal noon/2-pm deadlines or a guarantee of better evening energy. Trial-specific doses and time intervals must not become individualized prescriptions. NHLBI — Healthy Sleep Habits; Gardiner et al. — Dose and timing effects of caffeine on subsequent sleep.
 
-## 2. Sleep Routine
+**Product safety rules for both actions:** Do not recommend increased intake, compensatory concentrated consumption, abrupt total cessation, or changes conflicting with clinician guidance. Do not propose an arrangement that conflicts with disclosed work-safety needs. Personal records show associations, not that caffeine caused a feeling. Missing intake records remain unknown, not confirmed non-use.
 
-### Earlier action label — not the confirmed replacement copy
+## 2. Sleep routine — `finding:short-sleep:1`
 
-- Wind down 30 minutes earlier for three nights.
-
-**Category:** Sleep preparation / bedtime routine.
-
-**Evidence:** NIH/NHLBI recommends quiet time before bed and relaxation practices. This supports the general direction, not the exact “30 minutes earlier for three nights” schedule.
-
-- [NIH/NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
-
-### Product-confirmed action
+- **Eligibility:** Sleep-related goals with `rested-waking`. Energy-related goals qualify only when the user also reports a bedtime-routine concern; explain that the action concerns sleep preparation, not a proven energy treatment.
+- **Conditions:** The user wants to try a feasible quiet routine. One short-sleep record alone does not trigger the recommendation.
+- **Expected behavior:** Refer to the user's main sleep and available schedule. Do not interpret an under-seven-hours analysis group as an individual diagnosis or prescribed sleep target.
 
 **Make room for a quieter bedtime routine**
 
-> Choose a quiet activity before your planned bedtime, such as reading or relaxing without bright screens. Continue recording how rested you feel after waking.
+> Before your main sleep, choose a quiet activity that fits your routine, such as reading or relaxing away from bright screens. Keep noticing how rested you feel after waking.
+>
 
-### RD notes
+**Evidence and limitations:** NHLBI supports quiet time before bed and relaxation practices. It does not establish “30 minutes earlier for three nights” as a validated treatment schedule. NHLBI — Healthy Sleep Habits.
 
-- Use the confirmed flexible wording above; do not carry over the earlier mandatory 30-minute, three-night prescription.
-- Use rested-waking as the primary observation; evening energy may supply context but is not an interchangeable outcome. Do not instruct users to reduce sleep or force an earlier bedtime.
-- Do not claim the action treats insomnia.
+**Safety:** Do not reduce sleep opportunity, force earlier sleep, change medication, or claim to treat insomnia. The routine must not displace sleep or conflict with required duties or clinician guidance.
 
-## 3. Physical Activity
+**Acceptance:** Offer for a stated, feasible wind-down preference. Adapt to daytime main sleep. Do not recommend sacrificing sleep to complete the routine.
 
-### Earlier action labels — not the confirmed replacement copy
+## 3. Walking
 
-- A 10-minute walk after work.
-- A 10-minute evening walk.
+### `finding:movement-same:0`
 
-**Category:** Everyday physical activity.
+- **Eligibility:** Stay active; Have energy after work, Feel more energetic, or Have energy to exercise only when the user also wants a manageable activity option. Use the relevant `evening-energy` observation without promising improvement.
+- **Conditions:** The user indicates walking is comfortable and feasible, with suitable timing and surroundings. If there is no after-work context, confirm a suitable time and adapt the title.
+- **Expected behavior:** Offer a manageable length and comfortable pace. A daily activity total may include activity after the check-in; it cannot demonstrate that walking improved that evening's energy.
 
-**Evidence:** WHO identifies walking as physical activity and states that some activity is better than none. This supports an accessible activity option, but not a guaranteed improvement in evening energy or next-morning restedness from this exact schedule.
+**Try a short walk after work**
 
-- [WHO — Physical Activity](https://www.who.int/news-room/fact-sheets/detail/physical-activity)
+> If walking feels comfortable and fits your day, try a short walk after work at your own pace. Choose a manageable length, and answer your evening-energy check-in as usual.
+>
 
-### Product-confirmed action
+**Acceptance:** Offer when the user wants activity and reports feasibility. Do not infer feasibility from an activity record or recommend walking solely because an energy score is low.
 
-**Try a short, comfortable walk**
+### `finding:movement-prev:0`
 
-> If walking is suitable for you and fits your schedule, try a short walk at a comfortable pace. Continue your usual check-in and note how you feel.
+- **Eligibility:** Sleep-related goals with `rested-waking`, plus user interest in everyday walking.
+- **Conditions:** Evening walking is comfortable, safe, feasible, and does not delay main sleep.
+- **Expected behavior:** Explain this as an optional activity to explore, not a demonstrated way to improve next-morning restedness. Previous-day activity is not evidence about evening walking specifically.
 
-### RD notes
+**Try a short, comfortable evening walk**
 
-- Use the confirmed short, comfortable walk wording; do not enforce the earlier 10-minute, three-days-per-week prescription.
-- For this demo, use evening-energy as the primary observation when the user wants a suitable activity-related step. Record execution separately. Do not attach the action to rested-waking, stress or productivity automatically; do not assume after-work and evening timing produce identical outcomes.
-- Do not automatically increase duration or intensity when feedback shows no improvement.
+> If it fits your routine, try a short evening walk at a comfortable pace without delaying your main sleep. After waking, record how rested you feel.
+>
 
-## 4. Recording and Self-Monitoring
+**Acceptance:** Offer when the stated conditions hold. If evening timing would delay sleep, do not offer that arrangement; discuss another feasible option or recording without silently changing the plan.
 
-### Recording and observation inventory
+### Shared evidence and safety
 
-- Record caffeinated drinks and their times.
-- Complete a waking or evening check-in.
-- Answer tonight’s check-in, or skip it.
-- Keep noticing [topic].
-- Notice feelings after already-planned activity.
-- Reduce recording frequency during a busy week.
+WHO recognizes walking as physical activity and supports doing some activity rather than none. This does not validate a ten-minute, three-days-per-week schedule as a way to improve a particular user's energy or restedness. WHO — Physical activity.
 
-**Category:** Self-monitoring / flexible goal planning.
+Product rules: do not recommend walking against disclosed mobility/activity restrictions or in unsafe surroundings. Stop if activity causes discomfort or symptoms; preserve the existing safety response for concerning symptoms. Do not automatically increase duration, frequency, or intensity when the user reports no improvement. Ten minutes may be an adjustable plan option, not a requirement.
 
-**Evidence:** NICE supports goals and planning, feedback and monitoring as behavior-change techniques. It does not validate Aura's exact recording frequency or guarantee a health benefit from recording.
+## 4. Recording and self-monitoring
 
-- [NICE PH49 — Behaviour Change: Individual Approaches](https://www.nice.org.uk/guidance/ph49/chapter/1-Recom-)
+Recording is a meaningful next step in its own right. Connect it to a relevant goal, question, or observation; do not offer it mechanically whenever a lifestyle action is unavailable.
 
-### Product-confirmed copy
+- **Notice your caffeine routine:** “Record caffeinated drinks and their times without changing your usual intake.”
+- **Check in after your main sleep:** “Record how rested you feel after waking from your main sleep.”
+- **Keep it manageable this week:** “Choose an available day for a check-in. You can skip and return later.”
+- **Keep noticing [topic]:** “Answer your [check-in name] when it fits, or skip.” Render the actual topic and check-in name.
+- **Tonight's check-in:** Keep the existing evening-energy wording and explicit skip choice.
 
-**Notice your caffeine routine**
+NICE supports goals/planning and self-monitoring as behavior-change techniques. It does not validate Aura's exact frequency or guarantee a health benefit from journaling. NICE PH49, Recommendation 7.
 
-> Record caffeinated drinks and their times without changing your usual intake.
+Acceptance: skipping does not create an answer or completed action; observe-only does not change the user's routine. Offer pause/adjust controls only where implemented, and never claim an unsupported change was saved.
 
-**Check in after waking**
+## 5. Shared Agent and plan rules
 
-> Record how rested you feel after your main sleep.
+These are product selection rules informed by the cited sources, not a clinically validated recommendation algorithm.
 
-**Keep it manageable this week**
+1. Match both the user's goal and context. Sharing `evening-energy` does not make mood/stress goals automatically eligible for caffeine or walking actions. Unlisted goals receive no automatic lifestyle mapping; ask about the relevant concern or offer meaningful observation.
+2. Support two recommendation routes: a real, relevant finding, or an explicit user need that meets the action conditions. Without a finding, describe general guidance; never say “your data shows” or fabricate a finding to pass validation.
+3. Retain the existing IDs. For explicit-need recommendations, update the current finding-only gate to distinguish recommendation provenance from catalog identity. Only actual finding-backed suggestions receive finding text or factor-based rationale. Never bypass the gate by inventing evidence.
+4. Ask only for missing context needed by the action. When context is insufficient, clarify, offer relevant recording, or offer no action.
+5. Use fixed action content. Adapt user-confirmed timing and plan settings without inventing additional health instructions.
+6. Require user acceptance before creating or changing a plan. Declining, browsing, or skipping is not completion. Do not repeatedly pressure a user who declines.
+7. Three days, three nights, three days per week, and seven days are adjustable demo plan settings, not research-backed treatment durations. Remove mandatory noon/2-pm cutoffs, a mandatory 30-minute shift, and a mandatory ten-minute walk from copy and metadata. If a setting is retained as an option, label it as a plan choice.
+8. Plan review addresses observations, feasibility, and user feedback. No improvement does not establish failure and must not trigger automatic escalation.
+9. Mark synthetic history clearly; describe its findings as demo-scenario observations. Keep period dates as background context only, with no period-derived actions.
+10. Apply the same eligibility and safety rules in Discovery, Agent suggestions, and plan acceptance. Recheck relevant conditions at acceptance so stale drafts cannot bypass them.
 
-> Choose an available day for a check-in. You can skip and return later.
+## 6. Acceptance checklist
 
-### RD notes
+| Scenario | Expected result |
+| --- | --- |
+| Reviewer explores outside the scripted demo | All three categories can be offered when their conditions hold. |
+| Afternoon fatigue with unknown caffeine timing | Clarify or offer recording; no automatic cutoff recommendation. |
+| Late caffeine, sleep concern, interest in adjustment | Offer earlier timing without promising a benefit. |
+| Shift worker with daytime main sleep | Use main-sleep-relative language, not fixed morning/night assumptions. |
+| User wants a feasible quiet routine | Offer the routine without reducing sleep opportunity. |
+| User wants comfortable, feasible after-work activity | Offer a short walk without claiming an energy benefit. |
+| Walking conflicts with restrictions or sleep timing | Do not offer that arrangement; recording or no action is acceptable. |
+| Explicit relevant user need, no finding | A general option can be offered without fabricated evidence. |
+| Both caffeine IDs qualify | Show one caffeine option. |
+| No suitable lifestyle action | Relevant recording or no action; never force a match. |
+| User declines or skips | No plan/completion is created and no repeated pressure. |
+| Missing caffeine records | Unknown remains unknown, not “no caffeine.” |
+| Discovery versus chat versus acceptance | Consistent content, eligibility, safety, and provenance handling. |
 
-- Keep recording optional.
-- Do not describe recording as treatment.
-- Missing caffeine records must remain unknown, rather than count as no intake.
+## RD delivery
 
-## Shared Demo Rules
+Implement the five lifestyle actions and retain all six recording/observation templates above. Synchronize the two discovery catalogs and the Agent/acceptance path; verify this checklist. This documentation change does not itself enable runtime actions.
 
-- Use these sources to explain the general rationale, not to claim that mock records prove an action works.
-- Clearly identify synthetic history and describe findings as belonging to the demo scenario.
-- Keep exact durations, frequencies and clock times distinguishable from research findings.
-- Let the Agent select from fixed, agreed action content rather than invent new instructions.
-- Require user confirmation before starting or changing a plan.
-- Preserve safety blocking and the evidence/configuration and engineering checks in PRD §3.3. Sources support the documented rationale, not guaranteed safety or effectiveness; no additional named professional sign-off is required.
-- Period dates remain background context only; do not generate period-derived actions.
+For the existing Discovery and mock-period scope, retain PRD v0.3, section 3.1 as the background reference; this specification does not introduce a separate analysis configuration.
 
-## Implementation and release requirements
+## Source links
 
-- Prepare all three lifestyle categories for eligible reviewer exploration, not only the scripted demo. Product scope and wording are confirmed; record per-action source links, supported rationale, evidence limitations, eligible contexts, exclusions, stopping conditions, engineering test results and actual deployment availability separately.
-- For caffeine timing, use a relevant sleep/rested-waking context. An evening-energy/caffeine group difference alone must not trigger the action. Do not increase intake or prescribe a universal clock cutoff.
-- Keep all recording alternatives, including activity already planned, optional check-ins, and “Keep noticing [topic]”. Do not force lifestyle steps for every goal.
-- Seven days is a demo plan setting, not an effectiveness threshold. Use “After your main sleep, for 7 days”; replace “within an hour of waking” with “after waking from your main sleep”.
-- Say “in this demo scenario” in synthetic findings, chat and Review. Show the actual analysis date range, group counts and missingness. Never treat absent caffeine logs as confirmed no intake or use a group difference as proof of causation.
-- Preserve user confirmation, safety blocking, refusals, constraints, feedback and prior plan versions. If an action does not pass its release checks, leave that action unavailable and offer recording/observation; another cleared category need not remain disabled.
-- RD verifies current action IDs and deployed copy against this inventory. No new category or content-management system is required.
-
-For the confirmed Discovery and mock-period scope, refer to [PRD v0.3, §3.1](https://app.notion.com/p/3eccf214d45e80429dbbef6afaab1841). This document does not introduce a separate analysis configuration.
+- [NHLBI — Healthy Sleep Habits](https://www.nhlbi.nih.gov/health/sleep-deprivation/healthy-sleep-habits)
+- [Gardiner et al. — Dose and timing effects of caffeine on subsequent sleep](https://pubmed.ncbi.nlm.nih.gov/39377163/)
+- [WHO — Physical activity](https://www.who.int/news-room/fact-sheets/detail/physical-activity)
+- [NICE PH49 — Recommendation 7](https://www.nice.org.uk/guidance/ph49/chapter/1-recommendations)
