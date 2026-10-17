@@ -142,6 +142,14 @@ These are product selection rules informed by the cited sources, not a clinicall
 9. Mark synthetic history clearly; describe its findings as demo-scenario observations. Keep period dates as background context only, with no period-derived actions.
 10. Apply the same eligibility and safety rules in Discovery, Agent suggestions, and plan acceptance. Recheck relevant conditions at acceptance so stale drafts cannot bypass them.
 
+### Concrete arrangements and plan dates
+
+Before acceptance, confirm the specific drink/timing, quiet activity, or walk timing/length the user will try. This arrangement defines Done / Partly done / Not done; record perceived change separately. Not doing the action is not a worse feeling score.
+
+New demo plans default to seven days unless another supported duration is user-confirmed. Show and save start and Review dates; seven days does not require daily execution. Existing Day 10 plans keep their original dates and feedback. Reopening the app, viewing Review, or updating wording must not restart them. A confirmed adjustment creates a new version while preserving prior history.
+
+If evening walking does not fit a shift worker's or another user's routine, offer another eligible option, relevant observation, or no action. Do not silently rename/reschedule the action; a changed arrangement needs confirmation and its own eligibility checks.
+
 ## 6. Acceptance checklist
 
 | Scenario | Expected result |
