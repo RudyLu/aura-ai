@@ -122,3 +122,13 @@ web/                 Next.js app (UI, API routes, agent, safety)
   docs/              Integration notes and API contracts
 HealthConnectorPoC/  iOS app that sends Apple Health daily totals to a web session
 ```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [PRD v0.3](web/docs/prd-v0.3.md) | Product positioning, confirmed demo scope, behavior requirements and acceptance criteria. |
+| [Mock Demo — Action Categories and Evidence](web/docs/mock-demo-actions-and-evidence.md) | Action inventory, fixed wording, goal/topic eligibility, supporting sources and implementation checks. |
+| [Web setup and deployment](web/README.md) | Local setup, Google Cloud configuration and deployment instructions. |
+
+Product specifications describe intended behavior; implemented and deployed availability must be verified separately.

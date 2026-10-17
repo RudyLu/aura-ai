@@ -379,7 +379,7 @@ function SettingsSheet() {
     <>
       <h2 className="setttitle">Your settings</h2>
       <div className="setlabel"><span>Your goals</span><Btn act="open" val="goals" cls="quiet" label="Edit goals">Edit</Btn></div>
-      {goals.length ? <div className="goalcards">{goals.map((g, i) => <div key={g.id} className="goalcard"><Raw html={goalArt(g.group, 64)} /><span>{g.label}{i === 0 ? <small>Priority</small> : null}<small>{goalObservations(s, g.id).map(o => topic(o.topicId).name).join(' · ') || 'No check-in yet'}</small></span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'open', 'goals')}</ul>}
+      {goals.length ? <div className="goalcards">{goals.map((g, i) => <div key={g.id} className="goalcard"><Raw cls="goalcard-art" html={goalArt(g.group, 64)} /><span className="goalcard-label">{g.label}{i === 0 ? <small>Priority</small> : null}<small>{goalObservations(s, g.id).map(o => topic(o.topicId).name).join(' · ') || 'No check-in yet'}</small></span></div>)}</div> : <ul className="setlist">{row('Choose your goals', '', 'open', 'goals')}</ul>}
       <p className="setlabel"><span>Your daily check-ins</span></p>
       <ul className="setlist">{obs.map(o => row(topic(o.topicId).name, o.time, 'open', 'obsedit', { obs: o.id }))}{obs.length < TOPIC_IDS.length ? row('Add a check-in', '', 'open', 'addobs', {}, 'add') : null}</ul>
       <p className="setlabel"><span>Data</span></p>

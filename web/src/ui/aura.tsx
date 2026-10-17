@@ -113,7 +113,9 @@ export function Aura() {
       { transform: `translate(${x}px, ${y}px) scale(${from.width / to.width})`, opacity: 1 },
       { transform: 'translate(0, 0) scale(1)', opacity: .9 }
     ], { duration: 700, easing: 'cubic-bezier(.22, 1, .36, 1)' });
-    return () => animation.cancel();
+    // The hero shows the companion artwork; cross-fade it into the small mark while it moves.
+    const fade = orb.querySelector('.aura-heart-handover')?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, easing: 'ease-in' });
+    return () => { animation.cancel(); fade?.cancel(); };
   }, [hero]);
   useEffect(() => {
     const page=document.querySelector('.chatpage');
@@ -160,7 +162,7 @@ export function Aura() {
             <Btn act="open" val="preview">See this small step</Btn><Btn act="observe" cls="text">Just observe for now</Btn></div>
         ) : null}
         {ui.pending ? <TypingBubble /> : null}
-        {ui.chatError ? <div className="chaterror" role="alert"><p>{ui.chatError}</p><small>Your message is kept.</small><Btn act="chat-retry" cls="pillbtn">Try again</Btn></div> : null}
+        {ui.chatError ? <div className="chaterror" role="alert"><p>{ui.chatNeedsDemoConsent ? 'Allow labeled demo records to be sent to Gemini to continue.' : ui.chatError}</p><small>Your message is kept.</small><Btn act={ui.chatNeedsDemoConsent ? 'chat-allow-demo' : 'chat-retry'} cls="pillbtn" disabled={ui.pending}>{ui.chatNeedsDemoConsent ? 'Allow and continue' : 'Try again'}</Btn></div> : null}
         <NextUpCard />
       </div>
       {offer ? (

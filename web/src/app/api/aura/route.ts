@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   const q = body.data;
   const state = migrateState(await loadState(sid), mode);
   // The original Agent remains unchanged. Its canned offline replies are not shown as live AI.
-  if (mode === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
+  if (mode === 'demo' && !state.profile.includeDemoInAI) return NextResponse.json({ code: 'DEMO_CONSENT_REQUIRED', error: 'Allow demo records to be sent to Gemini in Settings first.' }, { status: 403 });
   if (q.inputRevision !== undefined && q.inputRevision !== (state.inputRevision || 0)) return NextResponse.json({ error: 'Records changed. Refresh and try again.' }, { status: 409 });
   let topicId: TopicId | null = null;
   try { if (q.choice) topicId = resolveChoice(state, q.text, q.choice); }

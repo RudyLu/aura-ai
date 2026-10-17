@@ -46,6 +46,8 @@ describe('POST /api/aura — request contract', () => {
     const s = demo(); s.profile.includeDemoInAI = false; await repo.saveState(slot('demo'), s);
     const res = await chat({ text: 'hi', today }, 'demo');
     expect(res.status).toBe(403);
+    // The client offers "Allow and continue" on this code alone.
+    expect((await res.json()).code).toBe('DEMO_CONSENT_REQUIRED');
     expect(gen).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,5 @@
 'use client';
-// Shared pieces ported from app.js: buttons that dispatch actions, the live Aura orb,
+// Shared pieces ported from app.js: buttons that dispatch actions, the live Aura mark,
 // the 1–5 slider, and the SVG art (kept as markup strings and injected into their
 // parent element, so the CSS sees the same structure as the prototype).
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
@@ -32,9 +32,18 @@ export const Raw = ({ html, cls, tag = 'span', label }: { html: string; cls?: st
   return <T className={cls} aria-hidden={label ? undefined : true} aria-label={label} dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-export const AuraMark = ({ size = '', state = 'idle' }: { size?: string; state?: string }) => (
-  <span className={`live-aura ${size}`} data-aura-state={state} aria-hidden="true"><span className="aura-atmosphere" /><span className="aura-core" /><span className="aura-ripple" /></span>
-);
+// Large marks use the dimensional companion, small ones the simplified mark. The top mark
+// also carries the companion, faded out as the hero hands over to it (see Aura()).
+const HEART_COMPANION = '/assets/brand/aura-heart-companion-v1-320.png', HEART_MARK = '/assets/brand/aura-heart-mark-v1-160.png';
+export const AuraMark = ({ size = '', state = 'idle' }: { size?: string; state?: string }) => {
+  const large = size === 'aura-hero' || size === 'aura-large';
+  return (
+    <span className={`live-aura aura-heart ${size}`} data-aura-state={state} aria-hidden="true"><span className="aura-atmosphere" /><span className="aura-core">
+      <img className="aura-heart-image" src={large ? HEART_COMPANION : HEART_MARK} width={large ? 320 : 160} height={large ? 320 : 160} alt="" draggable={false} />
+      {size === 'aura-top' ? <img className="aura-heart-image aura-heart-handover" src={HEART_COMPANION} width={320} height={320} alt="" draggable={false} /> : null}
+    </span><span className="aura-ripple" /></span>
+  );
+};
 
 export function Option({ text, on, act, val, sub, type = 'radio' }: { text: string; on: boolean; act: string; val: string; sub?: string; type?: 'radio' | 'check' }) {
   const key = `${act}|${val}|`;
