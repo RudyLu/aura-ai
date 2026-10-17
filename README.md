@@ -119,7 +119,7 @@ web/                 Next.js app (UI, API routes, agent, safety)
   src/domain/        Pure TypeScript shared by browser and server: topics, records, comparisons, demo timeline
   src/server/        Gemini client, agent, review, safety, storage, Apple Health link
   src/app/api/       HTTP routes
-  docs/              Integration notes and API contracts
+docs/                Product specs, integration notes and API contracts
 HealthConnectorPoC/  iOS app that sends Apple Health daily totals to a web session
 ```
 
@@ -127,8 +127,9 @@ HealthConnectorPoC/  iOS app that sends Apple Health daily totals to a web sessi
 
 | Document | Contents |
 |---|---|
-| [PRD v0.3](web/docs/prd-v0.3.md) | Product positioning, confirmed demo scope, behavior requirements and acceptance criteria. |
-| [Mock Demo — Action Categories and Evidence](web/docs/mock-demo-actions-and-evidence.md) | Action inventory, fixed wording, goal/topic eligibility, supporting sources and implementation checks. |
+| [Product overview](docs/PRODUCT.md) | Product summary. |
+| [PRD v0.3](docs/prd-v0.3.md) | Product positioning, confirmed demo scope, behavior requirements and acceptance criteria. |
+| [Mock Demo — Action Categories and Evidence](docs/mock-demo-actions-and-evidence.md) | Action inventory, fixed wording, goal/topic eligibility, supporting sources and implementation checks. |
 | [Web setup and deployment](web/README.md) | Local setup, Google Cloud configuration and deployment instructions. |
 
 Product specifications describe intended behavior; implemented and deployed availability must be verified separately.
