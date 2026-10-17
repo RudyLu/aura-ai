@@ -1727,12 +1727,15 @@ main.today.todayA { gap: 22px; }
 
 /* Splash: full-bleed video at the bottom layer, a dark scrim keeps the words legible */
 .aura-splash.hasvideo { position: relative; isolation: isolate; overflow: hidden; background: #0d0e11; }
-.splashvideo { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.splashvideo { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .splashvideo video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .splashvideo::after { content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, #0d0e1199 0%, #0d0e1122 22%, #0d0e1140 40%, #0d0e11d9 62%, #0d0e11f5 100%); }
+.aura-splash.hasvideo .aura-opening, .aura-splash.hasvideo .splashbottom { position: relative; z-index: 1; }
 .aura-splash.hasvideo .aura-opening { margin-top: auto; padding-top: 0; }
 .aura-splash.hasvideo .aura-opening h1, .aura-splash.hasvideo .splashlogo { text-shadow: 0 2px 24px #0008; }
+.splashplay { position: absolute; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 9px; padding: 12px 17px; border: 1px solid #ffffff55; border-radius: 999px; background: #161518bf; color: #fff; font: inherit; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.splashplay span { width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid currentColor; }
 @media (prefers-reduced-motion: reduce) { .splashvideo video { display: none; } .splashvideo { background: url(/assets/video/onboarding-bg.jpg) center / cover; } }
 @media (min-width: 461px) { .splashvideo { left: 50%; width: 430px; transform: translateX(-50%); } }
 
