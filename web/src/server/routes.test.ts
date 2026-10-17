@@ -34,7 +34,7 @@ describe('real file-backed routes and visitor/mode isolation',()=>{
   });
   it('only one concurrent command at a revision is saved',async()=>{
     await repo.saveState(`${identity.sid}-demo`,buildDemo(10));const s=(await repo.loadState(`${identity.sid}-demo`))!,p=s.plans[0];
-    const results=await Promise.all([cmd('decide',0,{planId:p.id,planVersion:1,choice:'observe'}),cmd('decide',0,{planId:p.id,planVersion:1,choice:'stop'})]);expect(results.map(r=>r.status).sort()).toEqual([200,409]);expect((await repo.loadState(`${identity.sid}-demo`))!.decisions).toHaveLength(1);
+    const results=await Promise.all([cmd('decide',0,{planId:p.id,planVersion:1,choice:'observe'}),cmd('decide',0,{planId:p.id,planVersion:1,choice:'stop'})]);expect(results.map(r=>r.status).sort()).toEqual([200,409]);expect((await repo.loadState(`${identity.sid}-demo`))!.decisions).toHaveLength(s.decisions.length + 1);
   });
   it('existing worse-feedback pause is saved and observation clears the presentation hold',async()=>{
     const s=buildDemo(10),p=s.plans[0];await repo.saveState(`${identity.sid}-demo`,s);
@@ -139,5 +139,58 @@ describe('chat request validation',()=>{
     expect((await chat({text:'I mean stress',today:'2026-10-08',inputRevision:3,choice:{messageIndex:0,optionId:'stress',topicId:'productivity'}})).status).toBe(400);
     expect((await chat({text:'I mean stress',today:'2026-10-08',choice:{messageIndex:0,optionId:'stress',topicId:'stress'}})).status).toBe(503);
     expect((await chat({text:'x',today:'2026-10-08',selectedTopic:'made-up'})).status).toBe(400);
+  });
+});
+
+
+describe('guided demo routes', () => {
+  it('serves exact scripted prompts without Gemini, only in demo mode', async () => {
+    const { DEMO_TURNS } = await import('@/domain/demoConversation');
+    const aura = await import('@/app/api/aura/route');
+    await repo.saveState(`${identity.sid}-demo`, buildDemo(1));
+    const body = {text: DEMO_TURNS[1][0].user, today: '2026-10-17'};
+    const response = await aura.POST(request('aura', body, 'demo'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).reply).toMatchObject({via:'preset', text:DEMO_TURNS[1][0].reply});
+    expect((await aura.POST(request('aura', body))).status).toBe(503);
+    expect((await aura.POST(request('aura', { ...body, text:'An unrelated message' }, 'demo'))).status).toBe(403);
+  });
+  it('keeps main revision, choice and persisted-safety checks on scripted requests', async () => {
+    const { DEMO_TURNS } = await import('@/domain/demoConversation');
+    const aura = await import('@/app/api/aura/route');
+    const s = buildDemo(1); s.profile.includeDemoInAI = true; s.inputRevision = 3;
+    await repo.saveState(`${identity.sid}-demo`, s);
+    const body = {text:DEMO_TURNS[1][0].user,today:'2026-10-17',inputRevision:3};
+    expect((await aura.POST(request('aura',{...body,inputRevision:2},'demo'))).status).toBe(409);
+    expect((await aura.POST(request('aura',{...body,choice:{messageIndex:0,optionId:'invented'}},'demo'))).status).toBe(400);
+    s.safetyEvents = [{id:'persisted-concern',level:'professional',at:'now',reasons:['existing concern']}];
+    await repo.saveState(`${identity.sid}-demo`, s);
+    // With generation disabled, a blocked script must fall through to honest unavailability.
+    expect((await aura.POST(request('aura',body,'demo'))).status).toBe(503);
+  });
+  it('accepts the demonstrated arrangement only after its dialogue and preserves history', async () => {
+    const { nextDemoTurn, scriptedDemoReply, demoProposal } = await import('@/domain/demoConversation');
+    const s = buildDemo(10), previous = s.plans.find(p => p.topicId === 'rested-waking')!;
+    while (nextDemoTurn(s)) {
+      const text = nextDemoTurn(s)!.turn.user;
+      s.messages.push({ role:'user', text });
+      const reply = scriptedDemoReply(s,text)!;
+      s.messages.push({ role:'guide', text:reply.text, meta:{via:reply.via,cited:reply.cited}, draft:reply.draft });
+    }
+    await repo.saveState(`${identity.sid}-demo`,s);
+    const draft = demoProposal('caffeine');
+    const data = {stepId:draft.stepId, topicId:draft.topicId, observationId:previous.observationId, step:draft.step, start:'2026-10-17', review:'2026-10-23'};
+    expect((await cmd('accept',0,{...data,step:'Drink more coffee'})).status).toBe(400);
+    const response = await cmd('accept',0,data);
+    expect(response.status).toBe(200);
+    const saved = (await response.json()).state;
+    expect(saved.plans.find((p:{id:string}) => p.id === previous.id).status).toBe('replaced');
+    expect(saved.plans.at(-1)).toMatchObject({title:draft.title,step:draft.step,lineageId:previous.lineageId,version:2});
+    expect(saved.feedbacks).toEqual(s.feedbacks);
+    expect(saved.messages.at(-1)).toMatchObject({role:'guide',meta:{via:'preset'},action:{type:'feedback',planId:saved.plans.at(-1).id}});
+    expect(saved.messages.at(-1).text).toContain('7 days');
+    expect(saved.messages.at(-1).text).toContain('Wake up rested');
+    const fresh = buildDemo(10); await repo.saveState(`${identity.sid}-demo`,fresh);
+    expect((await cmd('accept',0,{...data,observationId:fresh.observations.find(o=>o.topicId==='rested-waking')!.id})).status).toBe(400);
   });
 });
