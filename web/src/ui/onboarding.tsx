@@ -1,7 +1,7 @@
 'use client';
 // Splash and the setup flow (ported from app.js).
 import { TOPIC_ART } from './prototypeArt';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CONCERN_GROUPS, CONCERNS, rankTopics, topic } from '@/domain/topics';
 import { factorsFor, MIN_DAYS } from '@/domain/uiDiscovery';
 import { healthSummary, sourceLabel } from '@/domain/health';
@@ -15,9 +15,44 @@ const ATTEMPTS = ['An earlier bedtime', 'Less or earlier caffeine', 'More exerci
 const CONSTRAINTS = ['Keep it simple', 'Overtime and changing plans', 'Shift work', 'Family or caregiving'];
 
 export function Splash() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [needsPlay, setNeedsPlay] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let active = true;
+    const play = () => {
+      if (document.visibilityState === 'hidden') return;
+      const result = video.play();
+      if (result && typeof result.then === 'function') {
+        result.then(() => { if (active) setNeedsPlay(false); }).catch(() => { if (active) setNeedsPlay(true); });
+      }
+    };
+    const onPlaying = () => { if (active) setNeedsPlay(false); };
+    video.addEventListener('playing', onPlaying);
+    window.addEventListener('pageshow', play);
+    document.addEventListener('visibilitychange', play);
+    play();
+    return () => {
+      active = false;
+      video.removeEventListener('playing', onPlaying);
+      window.removeEventListener('pageshow', play);
+      document.removeEventListener('visibilitychange', play);
+    };
+  }, []);
+
+  const playVideo = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const result = video.play();
+    if (result && typeof result.then === 'function') result.then(() => setNeedsPlay(false)).catch(() => setNeedsPlay(true));
+  };
+
   return (
     <section className="splash aura-splash hasvideo">
-      <div className="splashvideo" aria-hidden="true"><video poster="/assets/video/onboarding-bg.jpg" autoPlay muted loop playsInline preload="auto"><source src="/assets/video/onboarding-bg.mp4" type="video/mp4" /><source src="/assets/video/onboarding-bg.webm" type="video/webm" /></video></div>
+      <div className="splashvideo" aria-hidden="true"><video ref={videoRef} poster="/assets/video/onboarding-bg.jpg" autoPlay muted loop playsInline preload="auto"><source src="/assets/video/onboarding-bg.mp4" type="video/mp4" /><source src="/assets/video/onboarding-bg.webm" type="video/webm" /></video></div>
+      {needsPlay ? <button type="button" className="splashplay" aria-label="Play background video" onClick={playVideo}><span aria-hidden="true" />Play video</button> : null}
       <div className="aura-opening">
         <p className="splashlogo"><AuraMark size="aura-brand" /><span className="logotype">Aura<span>.ai</span></span></p>
         <h1>Understand<br />how you live.</h1>
